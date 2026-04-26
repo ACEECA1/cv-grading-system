@@ -1,0 +1,364 @@
+{
+  "info": {
+    "_postman_id": "0f6ef167-8e5f-4f2c-99b4-57e93f95d9cf",
+    "name": "Recruitment System Backend",
+    "description": "Auth, role-based flows, CV upload, and n8n webhook callbacks.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "candidateUsername", "value": "candidate_demo" },
+    { "key": "candidateEmail", "value": "candidate_demo@mail.test" },
+    { "key": "candidatePassword", "value": "Password123" },
+    { "key": "candidateCode", "value": "" },
+    { "key": "candidateAccessToken", "value": "" },
+    { "key": "candidateRefreshToken", "value": "" },
+    { "key": "hrUsername", "value": "hr_demo" },
+    { "key": "hrEmail", "value": "hr_demo@mail.test" },
+    { "key": "hrPassword", "value": "Password123" },
+    { "key": "hrCode", "value": "" },
+    { "key": "hrUserId", "value": "" },
+    { "key": "hrAccessToken", "value": "" },
+    { "key": "adminUsername", "value": "admin" },
+    { "key": "adminPassword", "value": "Admin@123456" },
+    { "key": "adminAccessToken", "value": "" },
+    { "key": "jobOfferId", "value": "" },
+    { "key": "evaluationId", "value": "" },
+    { "key": "apiKey", "value": "n8n-webhook-key-2026" }
+  ],
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Register Candidate",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/register/candidate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{candidateUsername}}\",\n  \"firstName\": \"Candidate\",\n  \"lastName\": \"Demo\",\n  \"email\": \"{{candidateEmail}}\",\n  \"password\": \"{{candidatePassword}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Verify Candidate Email",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/verify",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{candidateEmail}}\",\n  \"code\": \"{{candidateCode}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login Candidate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('candidateAccessToken', json.data.accessToken);",
+                  "pm.collectionVariables.set('candidateRefreshToken', json.data.refreshToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usernameOrEmail\": \"{{candidateUsername}}\",\n  \"password\": \"{{candidatePassword}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Refresh Candidate Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/refresh",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{candidateRefreshToken}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Logout Candidate",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/logout",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{candidateRefreshToken}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Register HR",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/register/hr",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{hrUsername}}\",\n  \"firstName\": \"Human\",\n  \"lastName\": \"Resources\",\n  \"email\": \"{{hrEmail}}\",\n  \"password\": \"{{hrPassword}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Verify HR Email",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/verify",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{hrEmail}}\",\n  \"code\": \"{{hrCode}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('adminAccessToken', json.data.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usernameOrEmail\": \"{{adminUsername}}\",\n  \"password\": \"{{adminPassword}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Admin HR Approval",
+      "item": [
+        {
+          "name": "List Pending HR Accounts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.length > 0) {",
+                  "  pm.collectionVariables.set('hrUserId', json.data[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }],
+            "url": "{{baseUrl}}/api/admin/hr/pending"
+          }
+        },
+        {
+          "name": "Approve HR Account",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }],
+            "url": "{{baseUrl}}/api/admin/hr/{{hrUserId}}/approve"
+          }
+        },
+        {
+          "name": "Login HR (After Admin Approval)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('hrAccessToken', json.data.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usernameOrEmail\": \"{{hrUsername}}\",\n  \"password\": \"{{hrPassword}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Job Offers (HR + Candidate View)",
+      "item": [
+        {
+          "name": "Create Job Offer (HR)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('jobOfferId', json.data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{hrAccessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/hr/job-offers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Backend Engineer\",\n  \"rawText\": \"We need a Java Spring Boot engineer with microservices and PostgreSQL experience.\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Job Offer (HR)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{hrAccessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/hr/job-offers/{{jobOfferId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Senior Backend Engineer\",\n  \"rawText\": \"Updated JD text with Java, Spring, Docker, PostgreSQL and REST API responsibilities.\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List Job Offers (HR)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{hrAccessToken}}" }],
+            "url": "{{baseUrl}}/api/hr/job-offers"
+          }
+        },
+        {
+          "name": "List Public Job Offers",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/job-offers/public"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Candidate Submission Flow",
+      "item": [
+        {
+          "name": "Browse Offers (Candidate)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{candidateAccessToken}}" }],
+            "url": "{{baseUrl}}/api/candidate/job-offers"
+          }
+        },
+        {
+          "name": "Upload CV PDF",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('evaluationId', json.data.evaluationId);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{candidateAccessToken}}" }],
+            "url": "{{baseUrl}}/api/candidate/job-offers/{{jobOfferId}}/cv",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "C:/path/to/cv.pdf"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "View Candidate Submissions",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{candidateAccessToken}}" }],
+            "url": "{{baseUrl}}/api/candidate/submissions"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Webhook Callbacks (n8n Inbound)",
+      "item": [
+        {
+          "name": "Structured JD Callback",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-API-KEY", "value": "{{apiKey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/callbacks/job-offers/{{jobOfferId}}/structured-jd",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Senior Backend Engineer\",\n  \"companyName\": \"Acme Corp\",\n  \"requiredSkills\": [\"Java\", \"Spring Boot\", \"PostgreSQL\"],\n  \"preferredSkills\": [\"Docker\", \"Kubernetes\"],\n  \"experienceRange\": {\n    \"minYears\": \"3\",\n    \"maxYears\": \"7\"\n  },\n  \"responsibilities\": [\"Build APIs\", \"Design services\"],\n  \"qualifications\": [\"Computer Science Degree\"],\n  \"workLocation\": \"Remote\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Evaluation Callback",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-API-KEY", "value": "{{apiKey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/callbacks/evaluations/{{evaluationId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"SCORED\",\n  \"overallScore\": 82.5,\n  \"detailsJson\": \"{\\\"recommendation\\\":\\\"Strong fit\\\"}\"\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
