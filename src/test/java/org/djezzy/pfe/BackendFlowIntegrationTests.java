@@ -11,6 +11,7 @@ import org.djezzy.pfe.dao.VerificationCodeDAO;
 import org.djezzy.pfe.model.JobOffer;
 import org.djezzy.pfe.model.JobOfferStatus;
 import org.djezzy.pfe.model.User;
+import org.djezzy.pfe.service.AsyncWorkflowService;
 import org.djezzy.pfe.util.EmailUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,17 +20,20 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -57,6 +61,8 @@ class BackendFlowIntegrationTests {
     private StructuredJdDAO structuredJdDAO;
     @MockBean
     private EmailUtil emailUtil;
+    @MockBean
+    private AsyncWorkflowService asyncWorkflowService;
 
     @BeforeEach
     void setup() {
@@ -230,5 +236,147 @@ class BackendFlowIntegrationTests {
                         .content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("STRUCTURED"));
+    }
+
+    @Test
+    void mock_ocr_endpoint_accepts_json_without_auth() throws Exception {
+        mockMvc.perform(post("/api/mock/ocr")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "page", 1,
+                                "imageBase64", "ZmFrZS1pbWFnZS1jb250ZW50"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.extractedText").isNotEmpty());
+    }
+
+    @Test
+    void full_test_job_offer_endpoint_is_restricted_and_creates_structured_jd() throws Exception {
+        String candidateEmail = "test-candidate@mail.test";
+        String candidateUsername = "cand_" + UUID.randomUUID().toString().substring(0, 8);
+        String candidatePassword = "Password123";
+
+        mockMvc.perform(post("/api/auth/register/candidate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", candidateUsername,
+                                "firstName", "Test",
+                                "lastName", "Candidate",
+                                "email", candidateEmail,
+                                "password", candidatePassword
+                        ))))
+                .andExpect(status().isOk());
+        User candidate = userDAO.findByEmail(candidateEmail).orElseThrow();
+        String candidateCode = verificationCodeDAO.findTopByUserAndUsedFalseOrderByCreatedAtDesc(candidate).orElseThrow().getCode();
+        mockMvc.perform(post("/api/auth/verify")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("email", candidateEmail, "code", candidateCode))))
+                .andExpect(status().isOk());
+
+        MvcResult candidateLogin = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "usernameOrEmail", candidateUsername,
+                                "password", candidatePassword
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn();
+        String candidateToken = objectMapper.readTree(candidateLogin.getResponse().getContentAsString())
+                .path("data").path("accessToken").asText();
+
+        Map<String, Object> payload = Map.of(
+                "title", "Backend Engineer Test",
+                "rawText", "This backend role needs Java, Spring Boot, APIs, and SQL with real production delivery.",
+                "companyName", "Acme",
+                "experienceRange", Map.of("minYears", "2", "maxYears", "5"),
+                "workLocation", "Remote",
+                "requiredSkills", List.of("Java", "Spring Boot"),
+                "preferredSkills", List.of("Docker")
+        );
+
+        mockMvc.perform(post("/api/test/job-offers/full")
+                        .header("Authorization", "Bearer " + candidateToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isForbidden());
+
+        MvcResult adminLogin = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "usernameOrEmail", "admin",
+                                "password", "Admin@123456"
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn();
+        String adminToken = objectMapper.readTree(adminLogin.getResponse().getContentAsString())
+                .path("data").path("accessToken").asText();
+
+        mockMvc.perform(post("/api/test/job-offers/full")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("STRUCTURED"))
+                .andExpect(jsonPath("$.data.structuredJd.companyName").value("Acme"))
+                .andExpect(jsonPath("$.data.structuredJd.requiredSkills[0]").value("Java"));
+    }
+
+    @Test
+    void candidate_can_upload_cv_with_multipart_file() throws Exception {
+        String email = "upload-candidate@mail.test";
+        String username = "upload_" + UUID.randomUUID().toString().substring(0, 8);
+        String password = "Password123";
+
+        mockMvc.perform(post("/api/auth/register/candidate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", username,
+                                "firstName", "Upload",
+                                "lastName", "Candidate",
+                                "email", email,
+                                "password", password
+                        ))))
+                .andExpect(status().isOk());
+
+        User candidate = userDAO.findByEmail(email).orElseThrow();
+        String code = verificationCodeDAO.findTopByUserAndUsedFalseOrderByCreatedAtDesc(candidate).orElseThrow().getCode();
+        mockMvc.perform(post("/api/auth/verify")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("email", email, "code", code))))
+                .andExpect(status().isOk());
+
+        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "usernameOrEmail", username,
+                                "password", password
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn();
+        String token = objectMapper.readTree(loginResult.getResponse().getContentAsString())
+                .path("data").path("accessToken").asText();
+
+        User admin = userDAO.findByUsername("admin").orElseThrow();
+        JobOffer offer = new JobOffer();
+        offer.setTitle("Upload Test Offer");
+        offer.setRawText("This is a valid backend offer text used to test candidate CV multipart upload flow.");
+        offer.setStatus(JobOfferStatus.STRUCTURED);
+        offer.setCreatedBy(admin);
+        offer.setJdRequestId(UUID.randomUUID().toString());
+        jobOfferDAO.save(offer);
+
+        MockMultipartFile cvFile = new MockMultipartFile(
+                "file",
+                "candidate-cv.pdf",
+                MediaType.APPLICATION_PDF_VALUE,
+                "fake pdf content".getBytes(StandardCharsets.UTF_8)
+        );
+
+        mockMvc.perform(multipart("/api/candidate/job-offers/{jobOfferId}/cv", offer.getId())
+                        .file(cvFile)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.cvStatus").value("UPLOADED"))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("WAITING"));
     }
 }

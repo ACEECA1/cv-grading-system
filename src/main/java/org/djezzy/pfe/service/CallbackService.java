@@ -35,6 +35,9 @@ public class CallbackService {
 
     @Transactional
     public CandidateEvaluationDTO handleEvaluationCallback(Long evaluationId, EvaluationCallbackRequest request) {
+        if (request.candidateEvaluationId() != null && !request.candidateEvaluationId().equals(evaluationId)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Evaluation id mismatch");
+        }
         CandidateEvaluation evaluation = candidateEvaluationDAO.findById(evaluationId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Candidate evaluation not found"));
         evaluation.setStatus(request.status());

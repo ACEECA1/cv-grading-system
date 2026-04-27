@@ -7,6 +7,7 @@ import org.djezzy.pfe.dto.CreateJobOfferRequest;
 import org.djezzy.pfe.dto.ExperienceRangeDTO;
 import org.djezzy.pfe.dto.JobOfferDTO;
 import org.djezzy.pfe.dto.StructuredJdCallbackRequest;
+import org.djezzy.pfe.dto.TestJobOfferCreationDTO;
 import org.djezzy.pfe.dto.UpdateJobOfferRequest;
 import org.djezzy.pfe.model.ExperienceRange;
 import org.djezzy.pfe.model.JobOffer;
@@ -46,6 +47,28 @@ public class JobOfferService {
         jobOfferDAO.save(jobOffer);
         asyncWorkflowService.triggerStructuredJdWorkflow(jobOffer.getId());
         return mapperUtil.toJobOfferDto(jobOffer);
+    }
+
+    @Transactional
+    public JobOfferDTO createTestJobOfferWithStructuredJd(TestJobOfferCreationDTO request, User actor) {
+        JobOffer jobOffer = new JobOffer();
+        jobOffer.setTitle(request.title());
+        jobOffer.setRawText(request.rawText());
+        jobOffer.setStatus(JobOfferStatus.STRUCTURING);
+        jobOffer.setCreatedBy(actor);
+        jobOfferDAO.save(jobOffer);
+
+        StructuredJdCallbackRequest structuredRequest = new StructuredJdCallbackRequest(
+                request.title(),
+                request.companyName(),
+                request.requiredSkills(),
+                request.preferredSkills(),
+                request.experienceRange(),
+                List.of(),
+                List.of(),
+                request.workLocation()
+        );
+        return applyStructuredJdCallback(jobOffer.getId(), structuredRequest);
     }
 
     @Transactional

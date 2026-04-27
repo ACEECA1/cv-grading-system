@@ -41,6 +41,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/callbacks/**").permitAll()
+                        .requestMatchers("/api/mock/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/job-offers/public/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/hr/**", "/api/rh/**").hasAnyRole("HR", "ADMIN")

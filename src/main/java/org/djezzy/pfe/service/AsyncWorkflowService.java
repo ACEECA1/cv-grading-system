@@ -62,17 +62,20 @@ public class AsyncWorkflowService {
                 .subscribe();
     }
 
-    @Async("applicationTaskExecutor")
     @Transactional
-    public void processCvAndSendForEvaluation(Long cvId) {
+    public void processCvAndSendForEvaluation(Long cvId, Long evaluationId) {
         CV cv = cvdao.findById(cvId).orElse(null);
         if (cv == null) {
             log.warn("CV {} not found for evaluation workflow", cvId);
             return;
         }
-        CandidateEvaluation evaluation = candidateEvaluationDAO.findByCvId(cvId).orElse(null);
+        CandidateEvaluation evaluation = candidateEvaluationDAO.findById(evaluationId).orElse(null);
         if (evaluation == null) {
-            log.warn("Evaluation for CV {} not found", cvId);
+            log.warn("Evaluation {} not found for CV {}", evaluationId, cvId);
+            return;
+        }
+        if (evaluation.getCv() == null || !evaluation.getCv().getId().equals(cvId)) {
+            log.warn("Evaluation {} does not match CV {}", evaluationId, cvId);
             return;
         }
 

@@ -1,5 +1,6 @@
 package org.djezzy.pfe.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -45,13 +46,30 @@ public class OcrService {
         Map<String, Object> payload = new HashMap<>();
         payload.put("page", page);
         payload.put("imageBase64", imageBase64);
-        return webClient.post()
+        String responseBody = webClient.post()
                 .uri(appProperties.getOcrUrl())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(payload)
                 .retrieve()
                 .bodyToMono(String.class)
                 .block();
+        if (responseBody == null || responseBody.isBlank()) {
+            throw new AppException(HttpStatus.BAD_GATEWAY, "OCR service returned an empty response");
+        }
+        return extractText(responseBody);
+    }
+
+    private String extractText(String responseBody) {
+        try {
+            JsonNode jsonNode = objectMapper.readTree(responseBody);
+            JsonNode extractedText = jsonNode.get("extractedText");
+            if (extractedText != null && !extractedText.asText().isBlank()) {
+                return extractedText.asText();
+            }
+        } catch (JsonProcessingException ignored) {
+            return responseBody;
+        }
+        return responseBody;
     }
 
     public record OcrResult(String rawText, String payloadJson) {

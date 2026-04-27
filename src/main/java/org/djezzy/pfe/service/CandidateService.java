@@ -6,6 +6,7 @@ import org.djezzy.pfe.dao.CandidateEvaluationDAO;
 import org.djezzy.pfe.dto.CandidateSubmissionDTO;
 import org.djezzy.pfe.dto.JobOfferDTO;
 import org.djezzy.pfe.dto.UploadCvResponseDTO;
+import org.djezzy.pfe.event.CvUploadedEvent;
 import org.djezzy.pfe.model.CV;
 import org.djezzy.pfe.model.CVProcessingStatus;
 import org.djezzy.pfe.model.Candidate;
@@ -16,6 +17,7 @@ import org.djezzy.pfe.model.User;
 import org.djezzy.pfe.util.AppException;
 import org.djezzy.pfe.util.FileStorageUtil;
 import org.djezzy.pfe.util.MapperUtil;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +34,7 @@ public class CandidateService {
     private final JobOfferService jobOfferService;
     private final FileStorageUtil fileStorageUtil;
     private final MapperUtil mapperUtil;
-    private final AsyncWorkflowService asyncWorkflowService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Transactional
     public UploadCvResponseDTO uploadCv(Long jobOfferId, MultipartFile file, User user) {
@@ -60,7 +62,7 @@ public class CandidateService {
         cv.setCandidateEvaluation(evaluation);
         cvdao.save(cv);
 
-        asyncWorkflowService.processCvAndSendForEvaluation(cv.getId());
+        applicationEventPublisher.publishEvent(new CvUploadedEvent(cv.getId(), evaluation.getId()));
 
         return new UploadCvResponseDTO(
                 cv.getId(),
