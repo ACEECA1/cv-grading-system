@@ -4,8 +4,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.djezzy.pfe.dto.ApiResponse;
 import org.djezzy.pfe.dto.CandidateEvaluationDTO;
-import org.djezzy.pfe.dto.EvaluationCallbackRequest;
 import org.djezzy.pfe.dto.JobOfferDTO;
+import org.djezzy.pfe.dto.N8nEvaluationPayloadDTO;
 import org.djezzy.pfe.dto.StructuredJdCallbackRequest;
 import org.djezzy.pfe.service.CallbackService;
 import org.springframework.http.ResponseEntity;
@@ -33,7 +33,7 @@ public class CallbackController {
     @PutMapping("/evaluations/{evaluationId}")
     public ResponseEntity<ApiResponse<CandidateEvaluationDTO>> evaluationCallback(
             @PathVariable Long evaluationId,
-            @Valid @RequestBody EvaluationCallbackRequest request
+            @Valid @RequestBody N8nEvaluationPayloadDTO request
     ) {
         CandidateEvaluationDTO response = callbackService.handleEvaluationCallback(evaluationId, request);
         return ResponseEntity.ok(ApiResponse.ok("Evaluation callback applied", response));

@@ -47,4 +47,52 @@ public class StructuredJd extends BaseEntity {
 
     @OneToMany(mappedBy = "structuredJd", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Qualification> qualifications = new ArrayList<>();
+
+    public void clearRequiredSkills() {
+        requiredSkills.clear();
+    }
+
+    public void addRequiredSkill(RequiredSkill skill) {
+        if (skill == null) {
+            return;
+        }
+        requiredSkills.add(skill);
+        skill.setStructuredJd(this);
+    }
+
+    public void clearPreferredSkills() {
+        preferredSkills.clear();
+    }
+
+    public void addPreferredSkill(PreferredSkill skill) {
+        if (skill == null) {
+            return;
+        }
+        preferredSkills.add(skill);
+        skill.setStructuredJd(this);
+    }
+
+    public void clearResponsibilities() {
+        responsibilities.clear();
+    }
+
+    public void addResponsibility(Responsibility responsibility) {
+        if (responsibility == null) {
+            return;
+        }
+        responsibilities.add(responsibility);
+        responsibility.setStructuredJd(this);
+    }
+
+    public void clearQualifications() {
+        qualifications.clear();
+    }
+
+    public void addQualification(Qualification qualification) {
+        if (qualification == null) {
+            return;
+        }
+        qualifications.add(qualification);
+        qualification.setStructuredJd(this);
+    }
 }

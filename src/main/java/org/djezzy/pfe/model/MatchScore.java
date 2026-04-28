@@ -41,4 +41,28 @@ public class MatchScore extends BaseEntity {
 
     @Column(length = 8000)
     private String reasoning;
+
+    public void clearMatchedSkills() {
+        matchedSkills.clear();
+    }
+
+    public void addMatchedSkill(MatchedSkill skill) {
+        if (skill == null) {
+            return;
+        }
+        matchedSkills.add(skill);
+        skill.setMatchScore(this);
+    }
+
+    public void clearMissingSkills() {
+        missingSkills.clear();
+    }
+
+    public void addMissingSkill(MissingSkill skill) {
+        if (skill == null) {
+            return;
+        }
+        missingSkills.add(skill);
+        skill.setMatchScore(this);
+    }
 }

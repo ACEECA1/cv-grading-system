@@ -32,7 +32,7 @@ public class TechnicalQuestion extends BaseEntity {
     private String skillArea;
 
     @Column
-    private String bluffIndicator;
+    private Boolean bluffIndicator;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "candidate_evaluation_id", nullable = false)
@@ -40,4 +40,16 @@ public class TechnicalQuestion extends BaseEntity {
 
     @OneToMany(mappedBy = "technicalQuestion", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<FollowUpQuestion> followUpQuestions = new ArrayList<>();
+
+    public void clearFollowUpQuestions() {
+        followUpQuestions.clear();
+    }
+
+    public void addFollowUpQuestion(FollowUpQuestion followUpQuestion) {
+        if (followUpQuestion == null) {
+            return;
+        }
+        followUpQuestions.add(followUpQuestion);
+        followUpQuestion.setTechnicalQuestion(this);
+    }
 }

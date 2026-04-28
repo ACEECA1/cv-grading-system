@@ -23,4 +23,11 @@ public class Skill extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "profile_data_id", nullable = false)
     private ProfileData profileData;
+
+    public Skill() {
+    }
+
+    public Skill(String name) {
+        this.name = name;
+    }
 }

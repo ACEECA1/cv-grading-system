@@ -12,8 +12,11 @@ import lombok.Setter;
 @Table(name = "education_matches")
 public class EducationMatch extends BaseEntity {
     @Column
-    private String matchLevel;
+    private String requiredDegree;
 
     @Column
-    private String notes;
+    private String candidateDegree;
+
+    @Column
+    private String matchStatus;
 }

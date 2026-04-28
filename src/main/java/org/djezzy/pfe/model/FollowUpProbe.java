@@ -15,9 +15,13 @@ import lombok.Setter;
 @Table(name = "follow_up_probes")
 public class FollowUpProbe extends BaseEntity {
     @Column(length = 4000)
-    private String detail;
+    private String text;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "candidate_evaluation_id", nullable = false)
+    @JoinColumn(name = "hr_question_id", nullable = false)
+    private HRQuestion hrQuestion;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "candidate_evaluation_id")
     private CandidateEvaluation candidateEvaluation;
 }

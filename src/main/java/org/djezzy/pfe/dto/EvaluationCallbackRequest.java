@@ -13,15 +13,10 @@ public record EvaluationCallbackRequest(
         Double overallScore,
         String detailsJson,
         @JsonAlias("evaluationId") Long candidateEvaluationId,
-        @JsonAlias("match_score") MatchScorePayload matchScore
+        @JsonAlias("match_score") MatchScoreDTO matchScore,
+        @JsonAlias("profile_data") ProfileDataDTO profileData,
+        @JsonAlias("structured_jd") StructuredJdDTO structuredJd,
+        @JsonAlias("technical_questions") List<TechnicalQuestionDTO> technicalQuestions,
+        @JsonAlias("hr_questions") List<HrQuestionDTO> hrQuestions
 ) {
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record MatchScorePayload(
-            @JsonAlias("overall_score") Double overallScore,
-            @JsonAlias("matched_skills") List<String> matchedSkills,
-            @JsonAlias("missing_skills") List<String> missingSkills,
-            String recommendation,
-            String reasoning
-    ) {
-    }
 }

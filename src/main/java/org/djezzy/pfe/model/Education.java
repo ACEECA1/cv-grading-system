@@ -18,7 +18,7 @@ public class Education extends BaseEntity {
     private String degree;
 
     @Column
-    private String fieldOfStudy;
+    private String institution;
 
     @Column
     private String startDate;
@@ -27,7 +27,7 @@ public class Education extends BaseEntity {
     private String endDate;
 
     @Column
-    private String institution;
+    private String honors;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "profile_data_id", nullable = false)
