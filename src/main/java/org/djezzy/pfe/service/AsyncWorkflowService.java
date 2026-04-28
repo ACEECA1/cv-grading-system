@@ -13,8 +13,8 @@ import org.djezzy.pfe.model.CVProcessingStatus;
 import org.djezzy.pfe.model.CandidateEvaluation;
 import org.djezzy.pfe.model.EvaluationStatus;
 import org.djezzy.pfe.model.JobOffer;
+import org.djezzy.pfe.model.StructuredJd;
 import org.djezzy.pfe.util.AppException;
-import org.djezzy.pfe.util.MapperUtil;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -22,7 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.nio.file.Path;
-import java.util.HashMap;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Slf4j
@@ -36,7 +37,6 @@ public class AsyncWorkflowService {
     private final AppProperties appProperties;
     private final OcrService ocrService;
     private final ObjectMapper objectMapper;
-    private final MapperUtil mapperUtil;
 
     @Async("applicationTaskExecutor")
     @Transactional
@@ -86,19 +86,11 @@ public class AsyncWorkflowService {
             cv.setStatus(CVProcessingStatus.OCR_DONE);
             cvdao.save(cv);
 
-            Object structuredJd = cv.getJobOffer().getStructuredJd() == null
-                    ? null
-                    : objectMapper.readTree(objectMapper.writeValueAsString(mapperUtil.toStructuredJdDto(cv.getJobOffer().getStructuredJd())));
-            Map<String, Object> structuredPayload = new HashMap<>();
-            structuredPayload.put("jobOfferId", cv.getJobOffer().getId());
-            structuredPayload.put("structuredJd", structuredJd);
+            String jobDescriptionJson = buildJobDescriptionJson(cv.getJobOffer());
             Map<String, Object> payload = Map.of(
                     "evaluationId", evaluation.getId(),
-                    "cvId", cv.getId(),
-                    "candidateId", cv.getCandidate().getId(),
-                    "cvText", ocrResult.rawText(),
-                    "ocrPayloadJson", ocrResult.payloadJson(),
-                    "job", structuredPayload
+                    "text", ocrResult.rawText(),
+                    "job_description", jobDescriptionJson
             );
             webClient.post()
                     .uri(appProperties.getN8n().getEvaluationUrl())
@@ -123,5 +115,23 @@ public class AsyncWorkflowService {
             candidateEvaluationDAO.save(evaluation);
             log.error("CV processing failed", ex);
         }
+    }
+
+    private String buildJobDescriptionJson(JobOffer jobOffer) throws JsonProcessingException {
+        StructuredJd structuredJd = jobOffer.getStructuredJd();
+        Map<String, Object> experienceRange = new LinkedHashMap<>();
+        experienceRange.put("min_years", structuredJd == null || structuredJd.getExperienceRange() == null ? null : structuredJd.getExperienceRange().getMinYears());
+        experienceRange.put("max_years", structuredJd == null || structuredJd.getExperienceRange() == null ? null : structuredJd.getExperienceRange().getMaxYears());
+
+        Map<String, Object> jobDescription = new LinkedHashMap<>();
+        jobDescription.put("job_title", structuredJd != null && structuredJd.getTitle() != null ? structuredJd.getTitle() : jobOffer.getTitle());
+        jobDescription.put("company_name", structuredJd == null ? null : structuredJd.getCompanyName());
+        jobDescription.put("required_skills", structuredJd == null ? Collections.emptyList() : structuredJd.getRequiredSkills().stream().map(skill -> skill.getName()).toList());
+        jobDescription.put("preferred_skills", structuredJd == null ? Collections.emptyList() : structuredJd.getPreferredSkills().stream().map(skill -> skill.getName()).toList());
+        jobDescription.put("experience_range", experienceRange);
+        jobDescription.put("responsibilities", structuredJd == null ? Collections.emptyList() : structuredJd.getResponsibilities().stream().map(item -> item.getDescription()).toList());
+        jobDescription.put("qualifications", structuredJd == null ? Collections.emptyList() : structuredJd.getQualifications().stream().map(item -> item.getDescription()).toList());
+        jobDescription.put("work_location", structuredJd == null ? null : structuredJd.getWorkLocation());
+        return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(jobDescription);
     }
 }

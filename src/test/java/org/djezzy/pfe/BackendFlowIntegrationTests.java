@@ -8,8 +8,15 @@ import org.djezzy.pfe.dao.JobOfferDAO;
 import org.djezzy.pfe.dao.StructuredJdDAO;
 import org.djezzy.pfe.dao.UserDAO;
 import org.djezzy.pfe.dao.VerificationCodeDAO;
+import org.djezzy.pfe.model.CV;
+import org.djezzy.pfe.model.CVProcessingStatus;
+import org.djezzy.pfe.model.Candidate;
+import org.djezzy.pfe.model.CandidateEvaluation;
+import org.djezzy.pfe.model.EvaluationStatus;
 import org.djezzy.pfe.model.JobOffer;
 import org.djezzy.pfe.model.JobOfferStatus;
+import org.djezzy.pfe.model.RhApprovalStatus;
+import org.djezzy.pfe.model.Role;
 import org.djezzy.pfe.model.User;
 import org.djezzy.pfe.service.AsyncWorkflowService;
 import org.djezzy.pfe.util.EmailUtil;
@@ -21,10 +28,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.Instant;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +68,8 @@ class BackendFlowIntegrationTests {
     private CandidateEvaluationDAO candidateEvaluationDAO;
     @Autowired
     private StructuredJdDAO structuredJdDAO;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
     @MockBean
     private EmailUtil emailUtil;
     @MockBean
@@ -378,5 +389,107 @@ class BackendFlowIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.cvStatus").value("UPLOADED"))
                 .andExpect(jsonPath("$.data.evaluationStatus").value("WAITING"));
+    }
+
+    @Test
+    void evaluation_callback_accepts_extended_payload_and_maps_skill_arrays() throws Exception {
+        User admin = userDAO.findByUsername("admin").orElseThrow();
+
+        Candidate candidate = Candidate.builder()
+                .username("callback-candidate")
+                .firstName("Callback")
+                .lastName("Candidate")
+                .email("callback-candidate@mail.test")
+                .password("encoded")
+                .role(Role.CANDIDATE)
+                .isEnabled(true)
+                .rhApprovalStatus(RhApprovalStatus.APPROVED)
+                .build();
+        candidate = (Candidate) userDAO.save(candidate);
+
+        JobOffer offer = new JobOffer();
+        offer.setTitle("Callback Offer");
+        offer.setRawText("Callback offer content for evaluation mapping");
+        offer.setStatus(JobOfferStatus.STRUCTURED);
+        offer.setCreatedBy(admin);
+        offer.setJdRequestId(UUID.randomUUID().toString());
+        jobOfferDAO.save(offer);
+
+        CV cv = new CV();
+        cv.setCandidate(candidate);
+        cv.setJobOffer(offer);
+        cv.setFileUrl("target/test-uploads/callback.pdf");
+        cv.setUploadDate(Instant.now());
+        cv.setStatus(CVProcessingStatus.SENT_FOR_EVALUATION);
+        cvdao.save(cv);
+
+        CandidateEvaluation evaluation = new CandidateEvaluation();
+        evaluation.setCv(cv);
+        evaluation.setStructuredJd(offer.getStructuredJd());
+        evaluation.setStatus(EvaluationStatus.WAITING);
+        evaluation.setDetailsJson("{}");
+        candidateEvaluationDAO.save(evaluation);
+        cv.setCandidateEvaluation(evaluation);
+        cvdao.save(cv);
+
+        Map<String, Object> details = Map.of(
+                "status", "success",
+                "processing_time", "3.05s",
+                "evaluationId", evaluation.getId(),
+                "candidateId", candidate.getId(),
+                "profile_data", Map.of(
+                        "skills", List.of("Java", "Spring Boot", "PostgreSQL")
+                ),
+                "match_score", Map.of(
+                        "overall_score", 86.7,
+                        "matched_skills", List.of("Java", "Spring Boot", "PostgreSQL", "Docker"),
+                        "missing_skills", List.of("Kubernetes", "SIEM tooling")
+                ),
+                "technical_questions", List.of(Map.of("question", "Q1", "expectedAnswer", "A1")),
+                "hr_questions", List.of(Map.of("question", "Q2", "purpose", "P2"))
+        );
+
+        Map<String, Object> body = Map.of(
+                "status", "SCORED",
+                "overallScore", 86.7,
+                "evaluationId", evaluation.getId(),
+                "detailsJson", objectMapper.writeValueAsString(details),
+                "processing_time", "3.05s",
+                "match_score", Map.of(
+                        "overall_score", 86.7,
+                        "recommendation", "Strong fit for interview stage",
+                        "matched_skills", List.of("Java", "Spring Boot", "PostgreSQL", "Docker"),
+                        "missing_skills", List.of("Kubernetes", "SIEM tooling")
+                ),
+                "technical_questions", List.of(Map.of("question", "Q1", "expectedAnswer", "A1")),
+                "hr_questions", List.of(Map.of("question", "Q2", "purpose", "P2"))
+        );
+
+        mockMvc.perform(put("/api/callbacks/evaluations/{evaluationId}", evaluation.getId())
+                        .header("X-API-KEY", "test-callback-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SCORED"))
+                .andExpect(jsonPath("$.data.overallScore").value(86.7));
+
+        Long matchScoreId = jdbcTemplate.queryForObject(
+                "select match_score_id from candidate_evaluations where id = ?",
+                Long.class,
+                evaluation.getId()
+        );
+        assertThat(matchScoreId).isNotNull();
+        Integer matchedCount = jdbcTemplate.queryForObject(
+                "select count(*) from matched_skills where match_score_id = ?",
+                Integer.class,
+                matchScoreId
+        );
+        Integer missingCount = jdbcTemplate.queryForObject(
+                "select count(*) from missing_skills where match_score_id = ?",
+                Integer.class,
+                matchScoreId
+        );
+        assertThat(matchedCount).isEqualTo(4);
+        assertThat(missingCount).isEqualTo(2);
     }
 }

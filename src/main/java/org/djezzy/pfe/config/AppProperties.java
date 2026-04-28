@@ -11,11 +11,18 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "app")
 public class AppProperties {
     private int verificationCodeExpiryMinutes;
-    private String ocrUrl;
+    private Ocr ocr = new Ocr();
     private String fileUploadDir;
     private Callback callback = new Callback();
     private N8n n8n = new N8n();
     private Admin admin = new Admin();
+
+    @Getter
+    @Setter
+    public static class Ocr {
+        private String url;
+        private String apiKey;
+    }
 
     @Getter
     @Setter
