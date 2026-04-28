@@ -20,4 +20,11 @@ public class Hobby extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "profile_data_id", nullable = false)
     private ProfileData profileData;
+
+    public Hobby() {
+    }
+
+    public Hobby(String name) {
+        this.name = name;
+    }
 }

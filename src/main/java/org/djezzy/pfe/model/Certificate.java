@@ -9,8 +9,6 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.LocalDate;
-
 @Getter
 @Setter
 @Entity
@@ -23,7 +21,7 @@ public class Certificate extends BaseEntity {
     private String issuer;
 
     @Column
-    private LocalDate date;
+    private String date;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "profile_data_id", nullable = false)

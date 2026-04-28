@@ -119,43 +119,39 @@ public class JobOfferService {
             structuredJd.setExperienceRange(range);
         }
 
-        structuredJd.getRequiredSkills().clear();
+        structuredJd.clearRequiredSkills();
         if (request.requiredSkills() != null) {
             request.requiredSkills().forEach(skillName -> {
                 RequiredSkill skill = new RequiredSkill();
                 skill.setName(skillName);
-                skill.setStructuredJd(structuredJd);
-                structuredJd.getRequiredSkills().add(skill);
+                structuredJd.addRequiredSkill(skill);
             });
         }
 
-        structuredJd.getPreferredSkills().clear();
+        structuredJd.clearPreferredSkills();
         if (request.preferredSkills() != null) {
             request.preferredSkills().forEach(skillName -> {
                 PreferredSkill skill = new PreferredSkill();
                 skill.setName(skillName);
-                skill.setStructuredJd(structuredJd);
-                structuredJd.getPreferredSkills().add(skill);
+                structuredJd.addPreferredSkill(skill);
             });
         }
 
-        structuredJd.getResponsibilities().clear();
+        structuredJd.clearResponsibilities();
         if (request.responsibilities() != null) {
             request.responsibilities().forEach(value -> {
                 Responsibility responsibility = new Responsibility();
                 responsibility.setDescription(value);
-                responsibility.setStructuredJd(structuredJd);
-                structuredJd.getResponsibilities().add(responsibility);
+                structuredJd.addResponsibility(responsibility);
             });
         }
 
-        structuredJd.getQualifications().clear();
+        structuredJd.clearQualifications();
         if (request.qualifications() != null) {
             request.qualifications().forEach(value -> {
                 Qualification qualification = new Qualification();
                 qualification.setDescription(value);
-                qualification.setStructuredJd(structuredJd);
-                structuredJd.getQualifications().add(qualification);
+                structuredJd.addQualification(qualification);
             });
         }
 

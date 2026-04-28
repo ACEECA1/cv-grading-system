@@ -18,8 +18,5 @@ public class ContactInfo extends BaseEntity {
     private String phone;
 
     @Column
-    private String address;
-
-    @Column
     private String linkedin;
 }

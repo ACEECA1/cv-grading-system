@@ -432,37 +432,45 @@ class BackendFlowIntegrationTests {
         cv.setCandidateEvaluation(evaluation);
         cvdao.save(cv);
 
-        Map<String, Object> details = Map.of(
+        Map<String, Object> body = Map.of(
                 "status", "success",
                 "processing_time", "3.05s",
-                "evaluationId", evaluation.getId(),
-                "candidateId", candidate.getId(),
                 "profile_data", Map.of(
-                        "skills", List.of("Java", "Spring Boot", "PostgreSQL")
+                        "personal_info", Map.of(
+                                "first_name", "Callback",
+                                "last_name", "Candidate",
+                                "email", "callback-candidate@mail.test",
+                                "phone", "0555555555",
+                                "location", "Algiers"
+                        ),
+                        "skills", List.of("Java", "Spring Boot", "PostgreSQL"),
+                        "hobbies", List.of("Running", "Chess")
                 ),
-                "match_score", Map.of(
-                        "overall_score", 86.7,
-                        "matched_skills", List.of("Java", "Spring Boot", "PostgreSQL", "Docker"),
-                        "missing_skills", List.of("Kubernetes", "SIEM tooling")
-                ),
-                "technical_questions", List.of(Map.of("question", "Q1", "expectedAnswer", "A1")),
-                "hr_questions", List.of(Map.of("question", "Q2", "purpose", "P2"))
-        );
-
-        Map<String, Object> body = Map.of(
-                "status", "SCORED",
-                "overallScore", 86.7,
-                "evaluationId", evaluation.getId(),
-                "detailsJson", objectMapper.writeValueAsString(details),
-                "processing_time", "3.05s",
                 "match_score", Map.of(
                         "overall_score", 86.7,
                         "recommendation", "Strong fit for interview stage",
                         "matched_skills", List.of("Java", "Spring Boot", "PostgreSQL", "Docker"),
-                        "missing_skills", List.of("Kubernetes", "SIEM tooling")
+                        "missing_skills", List.of(
+                                Map.of("skill_name", "Kubernetes", "importance", "HIGH"),
+                                Map.of("skill_name", "SIEM tooling", "importance", "MEDIUM")
+                        )
                 ),
-                "technical_questions", List.of(Map.of("question", "Q1", "expectedAnswer", "A1")),
-                "hr_questions", List.of(Map.of("question", "Q2", "purpose", "P2"))
+                "technical_questions", List.of(Map.of(
+                        "question", "Q1",
+                        "expected_answer", "A1",
+                        "difficulty", "MEDIUM",
+                        "skill_area", "Java",
+                        "bluff_indicator", false,
+                        "follow_up_questions", List.of("Q1.1")
+                )),
+                "hr_questions", List.of(Map.of(
+                        "question", "Q2",
+                        "psychological_intent", "Assess communication",
+                        "ideal_response_indicators", List.of("Structured answer"),
+                        "red_flags", List.of("Vague responses"),
+                        "follow_up_probes", List.of("Can you give an example?"),
+                        "evaluation_criteria", "Clarity"
+                ))
         );
 
         mockMvc.perform(put("/api/callbacks/evaluations/{evaluationId}", evaluation.getId())

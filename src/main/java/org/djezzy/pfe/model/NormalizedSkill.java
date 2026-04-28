@@ -27,7 +27,7 @@ public class NormalizedSkill extends BaseEntity {
     private String proficiencyLevel;
 
     @Column
-    private String yearsExperience;
+    private Double yearsExperience;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "profile_data_id", nullable = false)

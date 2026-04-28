@@ -1,6 +1,7 @@
 package org.djezzy.pfe.model;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -44,7 +45,7 @@ public class CV extends BaseEntity {
     @JoinColumn(name = "job_offer_id", nullable = false)
     private JobOffer jobOffer;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(name = "profile_data_id")
     private ProfileData profileData;
 

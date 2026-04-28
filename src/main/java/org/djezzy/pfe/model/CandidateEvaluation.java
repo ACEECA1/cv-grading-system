@@ -40,16 +40,34 @@ public class CandidateEvaluation extends BaseEntity {
     @OneToMany(mappedBy = "candidateEvaluation", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<HRQuestion> hrQuestions = new ArrayList<>();
 
-    @OneToMany(mappedBy = "candidateEvaluation", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<FollowUpProbe> followUpProbes = new ArrayList<>();
-
-    @OneToMany(mappedBy = "candidateEvaluation", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<RedFlag> redFlags = new ArrayList<>();
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private EvaluationStatus status;
 
     @Lob
     private String detailsJson;
+
+    public void clearTechnicalQuestions() {
+        technicalQuestions.clear();
+    }
+
+    public void addTechnicalQuestion(TechnicalQuestion technicalQuestion) {
+        if (technicalQuestion == null) {
+            return;
+        }
+        technicalQuestions.add(technicalQuestion);
+        technicalQuestion.setCandidateEvaluation(this);
+    }
+
+    public void clearHrQuestions() {
+        hrQuestions.clear();
+    }
+
+    public void addHrQuestion(HRQuestion hrQuestion) {
+        if (hrQuestion == null) {
+            return;
+        }
+        hrQuestions.add(hrQuestion);
+        hrQuestion.setCandidateEvaluation(this);
+    }
 }

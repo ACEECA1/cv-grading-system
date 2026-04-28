@@ -20,4 +20,11 @@ public class MatchedSkill extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "match_score_id", nullable = false)
     private MatchScore matchScore;
+
+    public MatchedSkill() {
+    }
+
+    public MatchedSkill(String name) {
+        this.name = name;
+    }
 }

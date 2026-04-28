@@ -15,10 +15,10 @@ import lombok.Setter;
 @Table(name = "languages")
 public class Language extends BaseEntity {
     @Column
-    private String name;
+    private String language;
 
     @Column
-    private String proficiency;
+    private String level;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "profile_data_id", nullable = false)

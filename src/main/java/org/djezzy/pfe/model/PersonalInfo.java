@@ -18,8 +18,11 @@ public class PersonalInfo extends BaseEntity {
     private String lastName;
 
     @Column
-    private String dateOfBirth;
+    private String email;
 
     @Column
-    private String nationality;
+    private String phone;
+
+    @Column
+    private String location;
 }

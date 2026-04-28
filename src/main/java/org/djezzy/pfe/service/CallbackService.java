@@ -3,18 +3,35 @@ package org.djezzy.pfe.service;
 import lombok.RequiredArgsConstructor;
 import org.djezzy.pfe.dao.CVDAO;
 import org.djezzy.pfe.dao.CandidateEvaluationDAO;
-import org.djezzy.pfe.dao.MatchScoreDAO;
 import org.djezzy.pfe.dto.CandidateEvaluationDTO;
-import org.djezzy.pfe.dto.EvaluationCallbackRequest;
 import org.djezzy.pfe.dto.JobOfferDTO;
+import org.djezzy.pfe.dto.N8nEvaluationPayloadDTO;
 import org.djezzy.pfe.dto.StructuredJdCallbackRequest;
 import org.djezzy.pfe.model.CV;
 import org.djezzy.pfe.model.CVProcessingStatus;
 import org.djezzy.pfe.model.CandidateEvaluation;
+import org.djezzy.pfe.model.Certificate;
+import org.djezzy.pfe.model.ContactInfo;
+import org.djezzy.pfe.model.Education;
+import org.djezzy.pfe.model.EducationMatch;
 import org.djezzy.pfe.model.EvaluationStatus;
+import org.djezzy.pfe.model.Experience;
+import org.djezzy.pfe.model.ExperienceAlignment;
+import org.djezzy.pfe.model.FollowUpProbe;
+import org.djezzy.pfe.model.FollowUpQuestion;
+import org.djezzy.pfe.model.HRQuestion;
+import org.djezzy.pfe.model.Hobby;
+import org.djezzy.pfe.model.IdealResponseIndicator;
+import org.djezzy.pfe.model.Language;
 import org.djezzy.pfe.model.MatchedSkill;
 import org.djezzy.pfe.model.MatchScore;
 import org.djezzy.pfe.model.MissingSkill;
+import org.djezzy.pfe.model.NormalizedSkill;
+import org.djezzy.pfe.model.PersonalInfo;
+import org.djezzy.pfe.model.ProfileData;
+import org.djezzy.pfe.model.RedFlag;
+import org.djezzy.pfe.model.Skill;
+import org.djezzy.pfe.model.TechnicalQuestion;
 import org.djezzy.pfe.util.AppException;
 import org.djezzy.pfe.util.MapperUtil;
 import org.springframework.http.HttpStatus;
@@ -28,7 +45,6 @@ import java.util.List;
 public class CallbackService {
     private final JobOfferService jobOfferService;
     private final CandidateEvaluationDAO candidateEvaluationDAO;
-    private final MatchScoreDAO matchScoreDAO;
     private final CVDAO cvdao;
     private final MapperUtil mapperUtil;
 
@@ -38,83 +54,354 @@ public class CallbackService {
     }
 
     @Transactional
-    public CandidateEvaluationDTO handleEvaluationCallback(Long evaluationId, EvaluationCallbackRequest request) {
-        if (request.candidateEvaluationId() != null && !request.candidateEvaluationId().equals(evaluationId)) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Evaluation id mismatch");
-        }
+    public CandidateEvaluationDTO handleEvaluationCallback(Long evaluationId, N8nEvaluationPayloadDTO payload) {
         CandidateEvaluation evaluation = candidateEvaluationDAO.findById(evaluationId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Candidate evaluation not found"));
-        evaluation.setStatus(request.status());
-        if (request.detailsJson() != null) {
-            evaluation.setDetailsJson(request.detailsJson());
+        CV cv = evaluation.getCv();
+        if (cv == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Candidate evaluation is not linked to a CV");
         }
 
-        EvaluationCallbackRequest.MatchScorePayload matchScorePayload = request.matchScore();
-        if (request.overallScore() != null || matchScorePayload != null) {
-            MatchScore matchScore = evaluation.getMatchScore() == null ? new MatchScore() : evaluation.getMatchScore();
-            Double overallScore = request.overallScore();
-            if (overallScore == null && matchScorePayload != null) {
-                overallScore = matchScorePayload.overallScore();
-            }
-            if (overallScore != null) {
-                matchScore.setOverallScore(overallScore);
-            }
-            if (matchScorePayload != null) {
-                if (matchScorePayload.recommendation() != null) {
-                    matchScore.setRecommendation(matchScorePayload.recommendation());
-                }
-                if (matchScorePayload.reasoning() != null) {
-                    matchScore.setReasoning(matchScorePayload.reasoning());
-                }
-                mapMatchedSkills(matchScore, matchScorePayload.matchedSkills());
-                mapMissingSkills(matchScore, matchScorePayload.missingSkills());
-            }
-            matchScoreDAO.save(matchScore);
-            evaluation.setMatchScore(matchScore);
-        }
+        mapProfileData(cv, payload.profileData());
+        mapMatchScore(evaluation, payload.matchScore());
+        mapTechnicalQuestions(evaluation, payload.technicalQuestions());
+        mapHrQuestions(evaluation, payload.hrQuestions());
+
+        evaluation.setStatus(EvaluationStatus.SCORED);
+        cv.setStatus(CVProcessingStatus.EVALUATED);
 
         candidateEvaluationDAO.save(evaluation);
-        CV cv = evaluation.getCv();
-        if (cv != null) {
-            if (request.status() == EvaluationStatus.SCORED) {
-                cv.setStatus(CVProcessingStatus.EVALUATED);
-            } else if (request.status() == EvaluationStatus.FAILED) {
-                cv.setStatus(CVProcessingStatus.FAILED);
-            }
-            cvdao.save(cv);
-        }
+        cvdao.save(cv);
         return mapperUtil.toCandidateEvaluationDto(evaluation);
     }
 
-    private void mapMatchedSkills(MatchScore matchScore, List<String> matchedSkills) {
-        if (matchedSkills == null) {
+    private void mapProfileData(CV cv, N8nEvaluationPayloadDTO.ProfileDataDTO payload) {
+        if (payload == null) {
             return;
         }
-        matchScore.getMatchedSkills().clear();
-        for (String skillName : matchedSkills) {
-            if (skillName == null || skillName.isBlank()) {
+        ProfileData profileData = cv.getProfileData() == null ? new ProfileData() : cv.getProfileData();
+        mapPersonalInfo(profileData, payload.personalInfo());
+        mapExperiences(profileData, payload.experiences());
+        mapEducation(profileData, payload.education());
+        mapSkills(profileData, payload.skills());
+        mapLanguages(profileData, payload.languages());
+        mapCertificates(profileData, payload.certificates());
+        mapHobbies(profileData, payload.hobbies());
+        mapContactInfo(profileData, payload.contactInfo());
+        mapNormalizedSkills(profileData, payload.normalizedSkills());
+        cv.setProfileData(profileData);
+    }
+
+    private void mapPersonalInfo(ProfileData profileData, N8nEvaluationPayloadDTO.PersonalInfoDTO payload) {
+        if (payload == null) {
+            return;
+        }
+        PersonalInfo personalInfo = profileData.getPersonalInfo() == null ? new PersonalInfo() : profileData.getPersonalInfo();
+        personalInfo.setFirstName(payload.firstName());
+        personalInfo.setLastName(payload.lastName());
+        personalInfo.setEmail(payload.email());
+        personalInfo.setPhone(payload.phone());
+        personalInfo.setLocation(payload.location());
+        profileData.setPersonalInfo(personalInfo);
+    }
+
+    private void mapExperiences(ProfileData profileData, List<N8nEvaluationPayloadDTO.ExperienceDTO> experiences) {
+        profileData.clearExperiences();
+        if (experiences == null) {
+            return;
+        }
+        for (N8nEvaluationPayloadDTO.ExperienceDTO payload : experiences) {
+            if (payload == null) {
                 continue;
             }
-            MatchedSkill matchedSkill = new MatchedSkill();
-            matchedSkill.setName(skillName);
-            matchedSkill.setMatchScore(matchScore);
-            matchScore.getMatchedSkills().add(matchedSkill);
+            Experience experience = new Experience();
+            experience.setTitle(payload.title());
+            experience.setCompany(payload.company());
+            experience.setStartDate(payload.startDate());
+            experience.setEndDate(payload.endDate());
+            experience.setDescription(payload.description());
+            profileData.addExperience(experience);
         }
     }
 
-    private void mapMissingSkills(MatchScore matchScore, List<String> missingSkills) {
+    private void mapEducation(ProfileData profileData, List<N8nEvaluationPayloadDTO.EducationDTO> education) {
+        profileData.clearEducation();
+        if (education == null) {
+            return;
+        }
+        for (N8nEvaluationPayloadDTO.EducationDTO payload : education) {
+            if (payload == null) {
+                continue;
+            }
+            Education educationEntry = new Education();
+            educationEntry.setDegree(payload.degree());
+            educationEntry.setInstitution(payload.institution());
+            educationEntry.setStartDate(payload.startDate());
+            educationEntry.setEndDate(payload.endDate());
+            educationEntry.setHonors(payload.honors());
+            profileData.addEducation(educationEntry);
+        }
+    }
+
+    private void mapSkills(ProfileData profileData, List<String> skills) {
+        profileData.clearSkills();
+        if (skills == null) {
+            return;
+        }
+        for (String skillName : skills) {
+            if (!hasText(skillName)) {
+                continue;
+            }
+            profileData.addSkill(new Skill(skillName.trim()));
+        }
+    }
+
+    private void mapLanguages(ProfileData profileData, List<N8nEvaluationPayloadDTO.LanguageDTO> languages) {
+        profileData.clearLanguages();
+        if (languages == null) {
+            return;
+        }
+        for (N8nEvaluationPayloadDTO.LanguageDTO payload : languages) {
+            if (payload == null) {
+                continue;
+            }
+            Language language = new Language();
+            language.setLanguage(payload.language());
+            language.setLevel(payload.level());
+            profileData.addLanguage(language);
+        }
+    }
+
+    private void mapCertificates(ProfileData profileData, List<N8nEvaluationPayloadDTO.CertificateDTO> certificates) {
+        profileData.clearCertificates();
+        if (certificates == null) {
+            return;
+        }
+        for (N8nEvaluationPayloadDTO.CertificateDTO payload : certificates) {
+            if (payload == null) {
+                continue;
+            }
+            Certificate certificate = new Certificate();
+            certificate.setName(payload.name());
+            certificate.setIssuer(payload.issuer());
+            certificate.setDate(payload.date());
+            profileData.addCertificate(certificate);
+        }
+    }
+
+    private void mapHobbies(ProfileData profileData, List<String> hobbies) {
+        profileData.clearHobbies();
+        if (hobbies == null) {
+            return;
+        }
+        for (String hobbyName : hobbies) {
+            if (!hasText(hobbyName)) {
+                continue;
+            }
+            profileData.addHobby(new Hobby(hobbyName.trim()));
+        }
+    }
+
+    private void mapContactInfo(ProfileData profileData, N8nEvaluationPayloadDTO.ContactInfoDTO payload) {
+        if (payload == null) {
+            return;
+        }
+        ContactInfo contactInfo = profileData.getContactInfo() == null ? new ContactInfo() : profileData.getContactInfo();
+        contactInfo.setEmail(payload.email());
+        contactInfo.setPhone(payload.phone());
+        contactInfo.setLinkedin(payload.linkedin());
+        profileData.setContactInfo(contactInfo);
+    }
+
+    private void mapNormalizedSkills(ProfileData profileData, List<N8nEvaluationPayloadDTO.NormalizedSkillDTO> normalizedSkills) {
+        profileData.clearNormalizedSkills();
+        if (normalizedSkills == null) {
+            return;
+        }
+        for (N8nEvaluationPayloadDTO.NormalizedSkillDTO payload : normalizedSkills) {
+            if (payload == null) {
+                continue;
+            }
+            NormalizedSkill normalizedSkill = new NormalizedSkill();
+            normalizedSkill.setOriginalName(payload.originalName());
+            normalizedSkill.setNormalizedName(payload.normalizedName());
+            normalizedSkill.setCategory(payload.category());
+            normalizedSkill.setProficiencyLevel(payload.proficiencyLevel());
+            normalizedSkill.setYearsExperience(payload.yearsExperience());
+            profileData.addNormalizedSkill(normalizedSkill);
+        }
+    }
+
+    private void mapMatchScore(CandidateEvaluation evaluation, N8nEvaluationPayloadDTO.MatchScoreDTO payload) {
+        if (payload == null) {
+            return;
+        }
+        MatchScore matchScore = evaluation.getMatchScore() == null ? new MatchScore() : evaluation.getMatchScore();
+        matchScore.setOverallScore(payload.overallScore());
+        matchScore.setRecommendation(payload.recommendation());
+        matchScore.setReasoning(payload.reasoning());
+        mapMatchedSkills(matchScore, payload.matchedSkills());
+        mapMissingSkills(matchScore, payload.missingSkills());
+        mapExperienceAlignment(matchScore, payload.experienceAlignment());
+        mapEducationMatch(matchScore, payload.educationMatch());
+        evaluation.setMatchScore(matchScore);
+    }
+
+    private void mapMatchedSkills(MatchScore matchScore, List<String> matchedSkills) {
+        matchScore.clearMatchedSkills();
+        if (matchedSkills == null) {
+            return;
+        }
+        for (String skillName : matchedSkills) {
+            if (!hasText(skillName)) {
+                continue;
+            }
+            matchScore.addMatchedSkill(new MatchedSkill(skillName.trim()));
+        }
+    }
+
+    private void mapMissingSkills(MatchScore matchScore, List<N8nEvaluationPayloadDTO.MissingSkillDTO> missingSkills) {
+        matchScore.clearMissingSkills();
         if (missingSkills == null) {
             return;
         }
-        matchScore.getMissingSkills().clear();
-        for (String skillName : missingSkills) {
-            if (skillName == null || skillName.isBlank()) {
+        for (N8nEvaluationPayloadDTO.MissingSkillDTO payload : missingSkills) {
+            if (payload == null || !hasText(payload.skillName())) {
                 continue;
             }
-            MissingSkill missingSkill = new MissingSkill();
-            missingSkill.setName(skillName);
-            missingSkill.setMatchScore(matchScore);
-            matchScore.getMissingSkills().add(missingSkill);
+            matchScore.addMissingSkill(new MissingSkill(payload.skillName().trim(), payload.importance()));
         }
+    }
+
+    private void mapExperienceAlignment(MatchScore matchScore, N8nEvaluationPayloadDTO.ExperienceAlignmentDTO payload) {
+        if (payload == null) {
+            return;
+        }
+        ExperienceAlignment experienceAlignment = matchScore.getExperienceAlignment() == null
+                ? new ExperienceAlignment()
+                : matchScore.getExperienceAlignment();
+        experienceAlignment.setYearsRequired(payload.yearsRequired());
+        experienceAlignment.setYearsCandidate(payload.yearsCandidate());
+        experienceAlignment.setMatchPercentage(payload.matchPercentage());
+        matchScore.setExperienceAlignment(experienceAlignment);
+    }
+
+    private void mapEducationMatch(MatchScore matchScore, N8nEvaluationPayloadDTO.EducationMatchDTO payload) {
+        if (payload == null) {
+            return;
+        }
+        EducationMatch educationMatch = matchScore.getEducationMatch() == null
+                ? new EducationMatch()
+                : matchScore.getEducationMatch();
+        educationMatch.setRequiredDegree(payload.requiredDegree());
+        educationMatch.setCandidateDegree(payload.candidateDegree());
+        educationMatch.setMatchStatus(payload.matchStatus());
+        matchScore.setEducationMatch(educationMatch);
+    }
+
+    private void mapTechnicalQuestions(CandidateEvaluation evaluation, List<N8nEvaluationPayloadDTO.TechnicalQuestionDTO> technicalQuestions) {
+        if (technicalQuestions == null) {
+            return;
+        }
+        evaluation.clearTechnicalQuestions();
+        for (N8nEvaluationPayloadDTO.TechnicalQuestionDTO payload : technicalQuestions) {
+            if (payload == null) {
+                continue;
+            }
+            TechnicalQuestion technicalQuestion = new TechnicalQuestion();
+            technicalQuestion.setQuestion(payload.question());
+            technicalQuestion.setExpectedAnswer(payload.expectedAnswer());
+            technicalQuestion.setDifficulty(payload.difficulty());
+            technicalQuestion.setSkillArea(payload.skillArea());
+            technicalQuestion.setBluffIndicator(payload.bluffIndicator());
+            mapFollowUpQuestions(technicalQuestion, payload.followUpQuestions());
+            evaluation.addTechnicalQuestion(technicalQuestion);
+        }
+    }
+
+    private void mapFollowUpQuestions(TechnicalQuestion technicalQuestion, List<String> followUpQuestions) {
+        technicalQuestion.clearFollowUpQuestions();
+        if (followUpQuestions == null) {
+            return;
+        }
+        for (String text : followUpQuestions) {
+            if (!hasText(text)) {
+                continue;
+            }
+            FollowUpQuestion followUpQuestion = new FollowUpQuestion();
+            followUpQuestion.setText(text.trim());
+            technicalQuestion.addFollowUpQuestion(followUpQuestion);
+        }
+    }
+
+    private void mapHrQuestions(CandidateEvaluation evaluation, List<N8nEvaluationPayloadDTO.HrQuestionDTO> hrQuestions) {
+        if (hrQuestions == null) {
+            return;
+        }
+        evaluation.clearHrQuestions();
+        for (N8nEvaluationPayloadDTO.HrQuestionDTO payload : hrQuestions) {
+            if (payload == null) {
+                continue;
+            }
+            HRQuestion hrQuestion = new HRQuestion();
+            hrQuestion.setQuestion(payload.question());
+            hrQuestion.setPsychologicalIntent(payload.psychologicalIntent());
+            hrQuestion.setEvaluationCriteria(payload.evaluationCriteria());
+            mapIdealResponseIndicators(hrQuestion, payload.idealResponseIndicators());
+            mapRedFlags(hrQuestion, evaluation, payload.redFlags());
+            mapFollowUpProbes(hrQuestion, evaluation, payload.followUpProbes());
+            evaluation.addHrQuestion(hrQuestion);
+        }
+    }
+
+    private void mapIdealResponseIndicators(HRQuestion hrQuestion, List<String> indicators) {
+        hrQuestion.clearIdealResponseIndicators();
+        if (indicators == null) {
+            return;
+        }
+        for (String text : indicators) {
+            if (!hasText(text)) {
+                continue;
+            }
+            IdealResponseIndicator indicator = new IdealResponseIndicator();
+            indicator.setText(text.trim());
+            hrQuestion.addIdealResponseIndicator(indicator);
+        }
+    }
+
+    private void mapRedFlags(HRQuestion hrQuestion, CandidateEvaluation evaluation, List<String> redFlags) {
+        hrQuestion.clearRedFlags();
+        if (redFlags == null) {
+            return;
+        }
+        for (String text : redFlags) {
+            if (!hasText(text)) {
+                continue;
+            }
+            RedFlag redFlag = new RedFlag();
+            redFlag.setText(text.trim());
+            redFlag.setCandidateEvaluation(evaluation);
+            hrQuestion.addRedFlag(redFlag);
+        }
+    }
+
+    private void mapFollowUpProbes(HRQuestion hrQuestion, CandidateEvaluation evaluation, List<String> probes) {
+        hrQuestion.clearFollowUpProbes();
+        if (probes == null) {
+            return;
+        }
+        for (String text : probes) {
+            if (!hasText(text)) {
+                continue;
+            }
+            FollowUpProbe followUpProbe = new FollowUpProbe();
+            followUpProbe.setText(text.trim());
+            followUpProbe.setCandidateEvaluation(evaluation);
+            hrQuestion.addFollowUpProbe(followUpProbe);
+        }
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }

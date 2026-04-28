@@ -46,4 +46,88 @@ public class ProfileData extends BaseEntity {
 
     @OneToMany(mappedBy = "profileData", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<NormalizedSkill> normalizedSkills = new ArrayList<>();
+
+    public void clearSkills() {
+        skills.clear();
+    }
+
+    public void addSkill(Skill skill) {
+        if (skill == null) {
+            return;
+        }
+        skills.add(skill);
+        skill.setProfileData(this);
+    }
+
+    public void clearHobbies() {
+        hobbies.clear();
+    }
+
+    public void addHobby(Hobby hobby) {
+        if (hobby == null) {
+            return;
+        }
+        hobbies.add(hobby);
+        hobby.setProfileData(this);
+    }
+
+    public void clearExperiences() {
+        experiences.clear();
+    }
+
+    public void addExperience(Experience experience) {
+        if (experience == null) {
+            return;
+        }
+        experiences.add(experience);
+        experience.setProfileData(this);
+    }
+
+    public void clearEducation() {
+        education.clear();
+    }
+
+    public void addEducation(Education educationEntry) {
+        if (educationEntry == null) {
+            return;
+        }
+        education.add(educationEntry);
+        educationEntry.setProfileData(this);
+    }
+
+    public void clearLanguages() {
+        languages.clear();
+    }
+
+    public void addLanguage(Language language) {
+        if (language == null) {
+            return;
+        }
+        languages.add(language);
+        language.setProfileData(this);
+    }
+
+    public void clearCertificates() {
+        certificates.clear();
+    }
+
+    public void addCertificate(Certificate certificate) {
+        if (certificate == null) {
+            return;
+        }
+        certificates.add(certificate);
+        certificate.setProfileData(this);
+    }
+
+    public void clearNormalizedSkills() {
+        normalizedSkills.clear();
+    }
+
+    public void addNormalizedSkill(NormalizedSkill normalizedSkill) {
+        if (normalizedSkill == null) {
+            return;
+        }
+        normalizedSkills.add(normalizedSkill);
+        normalizedSkill.setProfileData(this);
+    }
 }
