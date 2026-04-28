@@ -36,3 +36,4 @@ public class PdfImageUtil {
         return Base64.getEncoder().encodeToString(outputStream.toByteArray());
     }
 }
+

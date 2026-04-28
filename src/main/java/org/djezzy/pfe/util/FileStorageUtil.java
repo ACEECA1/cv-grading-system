@@ -41,4 +41,17 @@ public class FileStorageUtil {
     public Path resolve(String filePath) {
         return Path.of(filePath).toAbsolutePath().normalize();
     }
+
+    public boolean exists(String filePath) {
+        return Files.exists(resolve(filePath));
+    }
+
+    public void deleteIfExists(String filePath) {
+        try {
+            Files.deleteIfExists(resolve(filePath));
+        } catch (IOException ex) {
+            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to delete stored CV file");
+        }
+    }
 }
+

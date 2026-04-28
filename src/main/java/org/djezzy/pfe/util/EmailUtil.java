@@ -18,3 +18,4 @@ public class EmailUtil {
         mailSender.send(message);
     }
 }
+

@@ -3,7 +3,7 @@ package org.djezzy.pfe.config;
 import lombok.RequiredArgsConstructor;
 import org.djezzy.pfe.filter.ApiKeyAuthenticationFilter;
 import org.djezzy.pfe.filter.JwtAuthenticationFilter;
-import org.djezzy.pfe.service.CustomUserDetailsService;
+import org.djezzy.pfe.service.auth.CustomUserDetailsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -42,6 +42,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/callbacks/**").permitAll()
                         .requestMatchers("/api/mock/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/system/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/job-offers/public/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/hr/**", "/api/rh/**").hasAnyRole("HR", "ADMIN")
@@ -85,3 +86,4 @@ public class SecurityConfig {
         return source;
     }
 }
+

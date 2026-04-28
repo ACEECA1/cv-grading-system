@@ -47,3 +47,4 @@ public class AppProperties {
         private String password;
     }
 }
+

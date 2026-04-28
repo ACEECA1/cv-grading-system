@@ -1,16 +1,17 @@
 package org.djezzy.pfe.util;
 
-import org.djezzy.pfe.dto.CandidateEvaluationDTO;
-import org.djezzy.pfe.dto.CandidateSubmissionDTO;
-import org.djezzy.pfe.dto.ExperienceRangeDTO;
-import org.djezzy.pfe.dto.JobOfferDTO;
-import org.djezzy.pfe.dto.StructuredJdDTO;
-import org.djezzy.pfe.dto.UserDTO;
-import org.djezzy.pfe.model.CV;
-import org.djezzy.pfe.model.CandidateEvaluation;
-import org.djezzy.pfe.model.JobOffer;
-import org.djezzy.pfe.model.StructuredJd;
-import org.djezzy.pfe.model.User;
+import org.djezzy.pfe.dto.evaluation.CandidateEvaluationDTO;
+import org.djezzy.pfe.dto.evaluation.CandidateSubmissionDTO;
+import org.djezzy.pfe.dto.job.ExperienceRangeDTO;
+import org.djezzy.pfe.dto.job.JobOfferDTO;
+import org.djezzy.pfe.dto.job.StructuredJdDTO;
+import org.djezzy.pfe.dto.auth.UserDTO;
+import org.djezzy.pfe.model.evaluation.CV;
+import org.djezzy.pfe.model.evaluation.CandidateEvaluation;
+import org.djezzy.pfe.model.job.JobOffer;
+import org.djezzy.pfe.model.evaluation.MatchScore;
+import org.djezzy.pfe.model.job.StructuredJd;
+import org.djezzy.pfe.model.auth.User;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -67,15 +68,43 @@ public class MapperUtil {
     }
 
     public CandidateEvaluationDTO toCandidateEvaluationDto(CandidateEvaluation evaluation) {
-        Double overallScore = null;
-        if (evaluation.getMatchScore() != null) {
-            overallScore = evaluation.getMatchScore().getOverallScore();
-        }
+        MatchScore matchScore = evaluation.getMatchScore();
+        Double overallScore = matchScore == null ? null : matchScore.getOverallScore();
+        String recommendation = matchScore == null ? null : matchScore.getRecommendation();
+        String reasoning = matchScore == null ? null : matchScore.getReasoning();
+        List<String> matchedSkills = matchScore == null
+                ? List.of()
+                : matchScore.getMatchedSkills().stream().map(item -> item.getName()).toList();
+        List<CandidateEvaluationDTO.MissingSkillDTO> missingSkills = matchScore == null
+                ? List.of()
+                : matchScore.getMissingSkills().stream()
+                .map(item -> new CandidateEvaluationDTO.MissingSkillDTO(item.getSkillName(), item.getImportance()))
+                .toList();
+        CandidateEvaluationDTO.ExperienceAlignmentDTO experienceAlignment = matchScore == null || matchScore.getExperienceAlignment() == null
+                ? null
+                : new CandidateEvaluationDTO.ExperienceAlignmentDTO(
+                matchScore.getExperienceAlignment().getYearsRequired(),
+                matchScore.getExperienceAlignment().getYearsCandidate(),
+                matchScore.getExperienceAlignment().getMatchPercentage()
+        );
+        CandidateEvaluationDTO.EducationMatchDTO educationMatch = matchScore == null || matchScore.getEducationMatch() == null
+                ? null
+                : new CandidateEvaluationDTO.EducationMatchDTO(
+                matchScore.getEducationMatch().getRequiredDegree(),
+                matchScore.getEducationMatch().getCandidateDegree(),
+                matchScore.getEducationMatch().getMatchStatus()
+        );
         return new CandidateEvaluationDTO(
                 evaluation.getId(),
                 evaluation.getStatus(),
                 overallScore,
-                evaluation.getDetailsJson()
+                evaluation.getDetailsJson(),
+                recommendation,
+                reasoning,
+                matchedSkills,
+                missingSkills,
+                experienceAlignment,
+                educationMatch
         );
     }
 
@@ -100,3 +129,4 @@ public class MapperUtil {
         return cvs.stream().map(this::toCandidateSubmissionDto).toList();
     }
 }
+

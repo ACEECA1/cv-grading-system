@@ -2,23 +2,23 @@ package org.djezzy.pfe;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.djezzy.pfe.dao.CVDAO;
-import org.djezzy.pfe.dao.CandidateEvaluationDAO;
-import org.djezzy.pfe.dao.JobOfferDAO;
-import org.djezzy.pfe.dao.StructuredJdDAO;
-import org.djezzy.pfe.dao.UserDAO;
-import org.djezzy.pfe.dao.VerificationCodeDAO;
-import org.djezzy.pfe.model.CV;
-import org.djezzy.pfe.model.CVProcessingStatus;
-import org.djezzy.pfe.model.Candidate;
-import org.djezzy.pfe.model.CandidateEvaluation;
-import org.djezzy.pfe.model.EvaluationStatus;
-import org.djezzy.pfe.model.JobOffer;
-import org.djezzy.pfe.model.JobOfferStatus;
-import org.djezzy.pfe.model.RhApprovalStatus;
-import org.djezzy.pfe.model.Role;
-import org.djezzy.pfe.model.User;
-import org.djezzy.pfe.service.AsyncWorkflowService;
+import org.djezzy.pfe.dao.evaluation.CVDAO;
+import org.djezzy.pfe.dao.evaluation.CandidateEvaluationDAO;
+import org.djezzy.pfe.dao.job.JobOfferDAO;
+import org.djezzy.pfe.dao.job.StructuredJdDAO;
+import org.djezzy.pfe.dao.auth.UserDAO;
+import org.djezzy.pfe.dao.auth.VerificationCodeDAO;
+import org.djezzy.pfe.model.evaluation.CV;
+import org.djezzy.pfe.model.evaluation.CVProcessingStatus;
+import org.djezzy.pfe.model.auth.Candidate;
+import org.djezzy.pfe.model.evaluation.CandidateEvaluation;
+import org.djezzy.pfe.model.evaluation.EvaluationStatus;
+import org.djezzy.pfe.model.job.JobOffer;
+import org.djezzy.pfe.model.job.JobOfferStatus;
+import org.djezzy.pfe.model.auth.RhApprovalStatus;
+import org.djezzy.pfe.model.auth.Role;
+import org.djezzy.pfe.model.auth.User;
+import org.djezzy.pfe.service.evaluation.AsyncWorkflowService;
 import org.djezzy.pfe.util.EmailUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -219,7 +219,7 @@ class BackendFlowIntegrationTests {
         JobOffer offer = new JobOffer();
         offer.setTitle("Backend Engineer");
         offer.setRawText("Java Spring Boot backend role");
-        offer.setStatus(JobOfferStatus.STRUCTURING);
+        offer.setStatus(JobOfferStatus.DRAFT);
         offer.setCreatedBy(admin);
         offer.setJdRequestId(UUID.randomUUID().toString());
         jobOfferDAO.save(offer);
@@ -246,7 +246,7 @@ class BackendFlowIntegrationTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("STRUCTURED"));
+                .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
     }
 
     @Test
@@ -327,7 +327,7 @@ class BackendFlowIntegrationTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("STRUCTURED"))
+                .andExpect(jsonPath("$.data.status").value("PUBLISHED"))
                 .andExpect(jsonPath("$.data.structuredJd.companyName").value("Acme"))
                 .andExpect(jsonPath("$.data.structuredJd.requiredSkills[0]").value("Java"));
     }
@@ -371,7 +371,7 @@ class BackendFlowIntegrationTests {
         JobOffer offer = new JobOffer();
         offer.setTitle("Upload Test Offer");
         offer.setRawText("This is a valid backend offer text used to test candidate CV multipart upload flow.");
-        offer.setStatus(JobOfferStatus.STRUCTURED);
+        offer.setStatus(JobOfferStatus.PUBLISHED);
         offer.setCreatedBy(admin);
         offer.setJdRequestId(UUID.randomUUID().toString());
         jobOfferDAO.save(offer);
@@ -410,7 +410,7 @@ class BackendFlowIntegrationTests {
         JobOffer offer = new JobOffer();
         offer.setTitle("Callback Offer");
         offer.setRawText("Callback offer content for evaluation mapping");
-        offer.setStatus(JobOfferStatus.STRUCTURED);
+        offer.setStatus(JobOfferStatus.PUBLISHED);
         offer.setCreatedBy(admin);
         offer.setJdRequestId(UUID.randomUUID().toString());
         jobOfferDAO.save(offer);
@@ -501,3 +501,4 @@ class BackendFlowIntegrationTests {
         assertThat(missingCount).isEqualTo(2);
     }
 }
+

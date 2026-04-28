@@ -3,7 +3,7 @@ package org.djezzy.pfe.util;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import org.djezzy.pfe.model.User;
+import org.djezzy.pfe.model.auth.User;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
@@ -90,3 +90,4 @@ public class JwtUtil {
         return accessExpirationMs;
     }
 }
+

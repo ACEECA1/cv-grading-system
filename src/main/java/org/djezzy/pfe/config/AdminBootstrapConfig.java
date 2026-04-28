@@ -1,11 +1,11 @@
 package org.djezzy.pfe.config;
 
 import lombok.RequiredArgsConstructor;
-import org.djezzy.pfe.dao.AdminDAO;
-import org.djezzy.pfe.dao.UserDAO;
-import org.djezzy.pfe.model.Admin;
-import org.djezzy.pfe.model.RhApprovalStatus;
-import org.djezzy.pfe.model.Role;
+import org.djezzy.pfe.dao.auth.AdminDAO;
+import org.djezzy.pfe.dao.auth.UserDAO;
+import org.djezzy.pfe.model.auth.Admin;
+import org.djezzy.pfe.model.auth.RhApprovalStatus;
+import org.djezzy.pfe.model.auth.Role;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -41,3 +41,4 @@ public class AdminBootstrapConfig {
         adminDAO.save(admin);
     }
 }
+
