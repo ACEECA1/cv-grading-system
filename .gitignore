@@ -34,3 +34,5 @@ build/
 .env
 
 IMPLEMENTATION_SUMMARY.md
+/uploads
+/uploads/*.pdf
