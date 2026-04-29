@@ -1,0 +1,29 @@
+package org.djezzy.pfe.dto.auth;
+
+import org.djezzy.pfe.dto.auth.*;
+import org.djezzy.pfe.dto.job.*;
+import org.djezzy.pfe.dto.evaluation.*;
+import org.djezzy.pfe.dto.system.*;
+
+import org.djezzy.pfe.model.auth.RhApprovalStatus;
+import org.djezzy.pfe.model.auth.Role;
+
+import java.time.Instant;
+
+public record UserDTO(
+        Long id,
+        String username,
+        String firstName,
+        String lastName,
+        String email,
+        Role role,
+        Boolean isEnabled,
+        RhApprovalStatus hrApprovalStatus,
+        Instant createdAt,
+        Instant updatedAt
+) {
+}
+
+
+
+
