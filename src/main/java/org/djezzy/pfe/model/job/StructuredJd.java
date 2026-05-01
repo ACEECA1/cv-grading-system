@@ -33,6 +33,9 @@ public class StructuredJd extends BaseEntity {
     @Column
     private String workLocation;
 
+    @Column
+    private String employmentType;
+
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(name = "experience_range_id")
     private ExperienceRange experienceRange;

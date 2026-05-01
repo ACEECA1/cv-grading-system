@@ -8,7 +8,8 @@ import org.djezzy.pfe.model.system.*;
 public enum JobOfferStatus {
     DRAFT,
     PUBLISHED,
-    CLOSED
+    CLOSED,
+    FAILED
 }
 
 

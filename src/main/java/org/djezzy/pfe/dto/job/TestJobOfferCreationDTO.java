@@ -18,6 +18,7 @@ public record TestJobOfferCreationDTO(
         @NotBlank @Size(max = 255) String companyName,
         @NotNull ExperienceRangeDTO experienceRange,
         @NotBlank @Size(max = 255) String workLocation,
+        String employmentType,
         @NotEmpty List<@NotBlank String> requiredSkills,
         List<@NotBlank String> preferredSkills
 ) {

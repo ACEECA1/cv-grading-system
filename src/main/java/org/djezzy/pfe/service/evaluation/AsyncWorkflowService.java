@@ -82,7 +82,7 @@ public class AsyncWorkflowService {
             String jobDescriptionJson = buildJobDescriptionJson(cv.getJobOffer());
             Map<String, Object> payload = Map.of(
                     "evaluationId", evaluation.getId(),
-                    "text", ocrResult.rawText(),
+                    "cv_text", ocrResult.rawText(),
                     "job_description", jobDescriptionJson
             );
             webClient.post()
@@ -125,8 +125,7 @@ public class AsyncWorkflowService {
         jobDescription.put("responsibilities", structuredJd == null ? Collections.emptyList() : structuredJd.getResponsibilities().stream().map(item -> item.getDescription()).toList());
         jobDescription.put("qualifications", structuredJd == null ? Collections.emptyList() : structuredJd.getQualifications().stream().map(item -> item.getDescription()).toList());
         jobDescription.put("work_location", structuredJd == null ? null : structuredJd.getWorkLocation());
+        jobDescription.put("employment_type", structuredJd == null ? null : structuredJd.getEmploymentType());
         return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(jobDescription);
     }
 }
-
-

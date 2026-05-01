@@ -60,6 +60,11 @@ public class JobOfferController {
         return ResponseEntity.ok(ApiResponse.ok("Job offer created", jobOfferService.createJobOffer(request, user)));
     }
 
+    @PostMapping({"/api/hr/job-offers/{jobOfferId}/retry", "/api/rh/job-offers/{jobOfferId}/retry"})
+    public ResponseEntity<ApiResponse<JobOfferDTO>> retryOffer(@PathVariable Long jobOfferId) {
+        return ResponseEntity.ok(ApiResponse.ok("Retry started", jobOfferService.retryJobDescriptionProcessing(jobOfferId)));
+    }
+
     @PutMapping({"/api/hr/job-offers/{jobOfferId}", "/api/rh/job-offers/{jobOfferId}"})
     public ResponseEntity<ApiResponse<JobOfferDTO>> updateOffer(
             @PathVariable Long jobOfferId,

@@ -28,7 +28,9 @@ public record StructuredJdDTO(
         @JsonAlias("qualifications")
         List<String> qualifications,
         @JsonAlias("work_location")
-        String workLocation
+        String workLocation,
+        @JsonAlias("employment_type")
+        String employmentType
 ) {
 }
 

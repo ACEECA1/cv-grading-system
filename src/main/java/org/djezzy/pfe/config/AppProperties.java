@@ -13,8 +13,10 @@ public class AppProperties {
     private int verificationCodeExpiryMinutes;
     private Ocr ocr = new Ocr();
     private String fileUploadDir;
+    private String companyName;
     private Callback callback = new Callback();
     private N8n n8n = new N8n();
+    private Openrouter openrouter = new Openrouter();
     private Admin admin = new Admin();
 
     @Getter
@@ -35,6 +37,16 @@ public class AppProperties {
     @Setter
     public static class Callback {
         private String apiKey;
+    }
+
+    @Getter
+    @Setter
+    public static class Openrouter {
+        private String apiKey;
+        private String url;
+        private String model;
+        private String systemPrompt;
+        private boolean logPayloads;
     }
 
     @Getter

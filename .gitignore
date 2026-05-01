@@ -36,3 +36,5 @@ build/
 IMPLEMENTATION_SUMMARY.md
 /uploads
 /uploads/*.pdf
+
+*.md

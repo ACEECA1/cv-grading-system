@@ -50,7 +50,8 @@ public class MapperUtil {
                 rangeDTO,
                 structuredJd.getResponsibilities().stream().map(r -> r.getDescription()).toList(),
                 structuredJd.getQualifications().stream().map(qualification -> qualification.getDescription()).toList(),
-                structuredJd.getWorkLocation()
+                structuredJd.getWorkLocation(),
+                structuredJd.getEmploymentType()
         );
     }
 
