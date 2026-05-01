@@ -46,6 +46,7 @@ public class AppProperties {
         private String url;
         private String model;
         private String systemPrompt;
+        private String repairSystemPrompt;
         private boolean logPayloads;
     }
 

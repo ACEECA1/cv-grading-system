@@ -37,26 +37,6 @@ public class LlmParsingService {
             .enable(JsonReadFeature.ALLOW_TRAILING_COMMA)
             .enable(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS)
             .build();
-    private static final String REPAIR_SYSTEM_PROMPT = """
-            Convert the user input into valid JSON only. Do not include markdown, prose, or explanations.
-            Use exactly this schema with quoted keys:
-            {
-              "job_title": string,
-              "company_name": string,
-              "required_skills": string[],
-              "preferred_skills": string[],
-              "experience_range": {
-                "min_years": string | null,
-                "max_years": string | null
-              },
-              "responsibilities": string[],
-              "qualifications": string[],
-              "work_location": string,
-              "employment_type": string
-            }
-            If a field is missing, return null (or [] for arrays). Output JSON only.
-            """;
-
     private final WebClient webClient;
     private final AppProperties appProperties;
     private final ObjectMapper objectMapper;
@@ -73,6 +53,10 @@ public class LlmParsingService {
         String normalizedSystemPrompt = normalizeSystemPrompt(openrouter.getSystemPrompt());
         if (isBlank(normalizedSystemPrompt)) {
             throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "Structured JD system prompt is empty after normalization");
+        }
+        String normalizedRepairSystemPrompt = normalizeSystemPrompt(openrouter.getRepairSystemPrompt());
+        if (isBlank(normalizedRepairSystemPrompt)) {
+            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "Repair system prompt is empty after normalization");
         }
         String userContent;
         try {
@@ -93,7 +77,7 @@ public class LlmParsingService {
         try {
             return deserializeStructuredJd(cleanLlmContent(rawContent));
         } catch (AppException ex) {
-            String repairResponse = callOpenRouter(openrouter, buildRepairPayload(openrouter, rawContent), "REPAIR");
+            String repairResponse = callOpenRouter(openrouter, buildRepairPayload(openrouter, normalizedRepairSystemPrompt, rawContent), "REPAIR");
             String repairedContent = extractMessageContent(repairResponse);
             if (repairedContent == null || repairedContent.isBlank()) {
                 throw ex;
@@ -210,11 +194,11 @@ public class LlmParsingService {
         return payload;
     }
 
-    private Map<String, Object> buildRepairPayload(AppProperties.Openrouter openrouter, String rawContent) {
+    private Map<String, Object> buildRepairPayload(AppProperties.Openrouter openrouter, String repairSystemPrompt, String rawContent) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("model", openrouter.getModel());
         payload.put("messages", List.of(
-                Map.of("role", "system", "content", REPAIR_SYSTEM_PROMPT),
+                Map.of("role", "system", "content", repairSystemPrompt),
                 Map.of("role", "user", "content", rawContent)
         ));
         payload.put("temperature", 0);
