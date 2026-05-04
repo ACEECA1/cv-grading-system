@@ -34,7 +34,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class OcrService {
     private static final int MIN_DIRECT_TEXT_LENGTH = 120;
-    private static final int MAX_IMAGE_BASE64_LENGTH = 180_000;
+    private static final int MAX_IMAGE_BASE64_LENGTH = 2_000_000;
 
     private final WebClient webClient;
     private final AppProperties appProperties;

@@ -38,4 +38,6 @@ IMPLEMENTATION_SUMMARY.md
 /uploads/*.pdf
 
 *.md
-commit
+commit.txt
+*.tex
+*.json
