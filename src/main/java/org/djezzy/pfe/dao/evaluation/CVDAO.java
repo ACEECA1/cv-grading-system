@@ -10,6 +10,7 @@ import java.util.Optional;
 
 public interface CVDAO extends JpaRepository<CV, Long> {
     List<CV> findByCandidateIdOrderByUploadDateDesc(Long candidateId);
+    List<CV> findByJobOfferIdOrderByUploadDateDesc(Long jobOfferId);
 
     Optional<CV> findTopByCandidateIdAndJobOfferIdOrderByUploadDateDesc(Long candidateId, Long jobOfferId);
 

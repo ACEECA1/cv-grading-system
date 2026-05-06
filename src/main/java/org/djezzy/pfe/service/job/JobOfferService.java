@@ -3,17 +3,24 @@ package org.djezzy.pfe.service.job;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.djezzy.pfe.config.AppProperties;
+import org.djezzy.pfe.dao.evaluation.CVDAO;
 import org.djezzy.pfe.dao.job.JobOfferDAO;
 import org.djezzy.pfe.dao.job.StructuredJdDAO;
+import org.djezzy.pfe.dto.job.ApplicantSummaryDTO;
 import org.djezzy.pfe.dto.job.CreateJobOfferRequest;
 import org.djezzy.pfe.dto.job.ExperienceRangeDTO;
+import org.djezzy.pfe.dto.job.JobOfferDetailDTO;
 import org.djezzy.pfe.dto.job.JobOfferDTO;
+import org.djezzy.pfe.dto.job.StructuredJdDTO;
 import org.djezzy.pfe.dto.job.StructuredJdCallbackRequest;
 import org.djezzy.pfe.dto.job.TestJobOfferCreationDTO;
 import org.djezzy.pfe.dto.job.UpdateJobOfferRequest;
+import org.djezzy.pfe.model.evaluation.CV;
+import org.djezzy.pfe.model.evaluation.CandidateEvaluation;
 import org.djezzy.pfe.model.job.ExperienceRange;
 import org.djezzy.pfe.model.job.JobOffer;
 import org.djezzy.pfe.model.job.JobOfferStatus;
+import org.djezzy.pfe.model.evaluation.MatchScore;
 import org.djezzy.pfe.model.job.PreferredSkill;
 import org.djezzy.pfe.model.job.Qualification;
 import org.djezzy.pfe.model.job.RequiredSkill;
@@ -37,12 +44,14 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class JobOfferService {
+    private final CVDAO cvdao;
     private final JobOfferDAO jobOfferDAO;
     private final StructuredJdDAO structuredJdDAO;
     private final LlmParsingService llmParsingService;
@@ -87,15 +96,57 @@ public class JobOfferService {
     }
 
     @Transactional
-    public JobOfferDTO updateJobOffer(Long jobOfferId, UpdateJobOfferRequest request) {
+    public JobOfferDetailDTO updateJobOffer(Long jobOfferId, UpdateJobOfferRequest request) {
         JobOffer jobOffer = findJobOffer(jobOfferId);
-        jobOffer.setTitle(request.title());
-        jobOffer.setRawText(request.rawText());
-        jobOffer.setStatus(JobOfferStatus.DRAFT);
-        jobOffer.setJdRequestId(UUID.randomUUID().toString());
+        UpdateJobOfferRequest.StructuredJdUpdateRequest structuredRequest = request.structuredJd();
+
+        jobOffer.setTitle(request.title().trim());
+
+        StructuredJd structuredJd = structuredJdDAO.findByJobOfferId(jobOfferId).orElse(new StructuredJd());
+        structuredJd.setJobOffer(jobOffer);
+
+        List<String> sanitizedResponsibilities = normalizeTextList(structuredRequest.responsibilities());
+        List<String> preservedQualifications = structuredJd.getQualifications() == null
+                ? List.of()
+                : structuredJd.getQualifications().stream()
+                .map(Qualification::getDescription)
+                .toList();
+
+        applyStructuredJdData(
+                structuredJd,
+                new StructuredJdCallbackRequest(
+                        request.title().trim(),
+                        structuredJd.getCompanyName(),
+                        normalizeTextList(structuredRequest.requiredSkills()),
+                        normalizeTextList(structuredRequest.preferredSkills()),
+                        structuredRequest.experienceRange(),
+                        sanitizedResponsibilities,
+                        preservedQualifications,
+                        trimToNull(structuredRequest.workLocation()),
+                        trimToNull(structuredRequest.employmentType())
+                )
+        );
+
+        structuredJdDAO.save(structuredJd);
+        jobOffer.setStructuredJd(structuredJd);
+        if (!sanitizedResponsibilities.isEmpty()) {
+            jobOffer.setRawText(String.join(System.lineSeparator(), sanitizedResponsibilities));
+        } else if (!hasText(jobOffer.getRawText())) {
+            jobOffer.setRawText(request.title().trim());
+        }
         jobOfferDAO.save(jobOffer);
-        triggerStructuredJdParsing(jobOffer);
-        return mapperUtil.toJobOfferDto(jobOffer);
+        return toJobOfferDetailDto(jobOffer);
+    }
+
+    @Transactional
+    public JobOfferDetailDTO toggleJobStatus(Long jobOfferId, JobOfferStatus status) {
+        if (status != JobOfferStatus.PUBLISHED && status != JobOfferStatus.CLOSED) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Status must be either PUBLISHED or CLOSED");
+        }
+        JobOffer jobOffer = findJobOffer(jobOfferId);
+        jobOffer.setStatus(status);
+        jobOfferDAO.save(jobOffer);
+        return toJobOfferDetailDto(jobOffer);
     }
 
     @Transactional
@@ -119,7 +170,9 @@ public class JobOfferService {
 
     @Transactional(readOnly = true)
     public List<JobOfferDTO> listPublicJobOffers() {
-        return mapperUtil.toJobOfferDtos(jobOfferDAO.findByStatus(JobOfferStatus.PUBLISHED));
+        return jobOfferDAO.findByStatus(JobOfferStatus.PUBLISHED).stream()
+                .map(this::toPublicJobOfferDto)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -133,7 +186,7 @@ public class JobOfferService {
                     )
             );
         }
-        return jobOfferDAO.findAll(specification, pageable).map(mapperUtil::toJobOfferDto);
+        return jobOfferDAO.findAll(specification, pageable).map(this::toPublicJobOfferDto);
     }
 
     @Transactional(readOnly = true)
@@ -166,6 +219,28 @@ public class JobOfferService {
             specification = specification.and((root, query, cb) -> cb.equal(root.get("status"), status));
         }
         return jobOfferDAO.findAll(specification, pageable).map(mapperUtil::toJobOfferDto);
+    }
+
+    @Transactional(readOnly = true)
+    public JobOfferDetailDTO getJobOffer(Long jobOfferId) {
+        return toJobOfferDetailDto(findJobOffer(jobOfferId));
+    }
+
+    @Transactional(readOnly = true)
+    public JobOfferDetailDTO getPublicJobOffer(Long jobOfferId) {
+        JobOffer jobOffer = findJobOffer(jobOfferId);
+        if (jobOffer.getStatus() != JobOfferStatus.PUBLISHED) {
+            throw new AppException(HttpStatus.NOT_FOUND, "Job offer not found");
+        }
+        return toPublicJobOfferDetailDto(jobOffer);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ApplicantSummaryDTO> getJobApplicants(Long jobOfferId) {
+        findJobOffer(jobOfferId);
+        return cvdao.findByJobOfferIdOrderByUploadDateDesc(jobOfferId).stream()
+                .map(this::toApplicantSummaryDto)
+                .toList();
     }
 
     @Transactional
@@ -288,6 +363,94 @@ public class JobOfferService {
         );
     }
 
+    private JobOfferDetailDTO toJobOfferDetailDto(JobOffer jobOffer) {
+        return new JobOfferDetailDTO(
+                jobOffer.getId(),
+                jobOffer.getTitle(),
+                jobOffer.getStatus(),
+                jobOffer.getCreatedAt(),
+                mapperUtil.toStructuredJdDto(jobOffer.getStructuredJd())
+        );
+    }
+
+    private JobOfferDTO toPublicJobOfferDto(JobOffer jobOffer) {
+        JobOfferDTO dto = mapperUtil.toJobOfferDto(jobOffer);
+        return new JobOfferDTO(
+                dto.id(),
+                dto.title(),
+                dto.rawText(),
+                dto.status(),
+                dto.jdRequestId(),
+                sanitizeStructuredJdForPublic(dto.structuredJd()),
+                dto.createdAt(),
+                dto.updatedAt()
+        );
+    }
+
+    private JobOfferDetailDTO toPublicJobOfferDetailDto(JobOffer jobOffer) {
+        JobOfferDetailDTO dto = toJobOfferDetailDto(jobOffer);
+        return new JobOfferDetailDTO(
+                dto.id(),
+                dto.title(),
+                dto.status(),
+                dto.createdAt(),
+                sanitizeStructuredJdForPublic(dto.structuredJd())
+        );
+    }
+
+    private StructuredJdDTO sanitizeStructuredJdForPublic(StructuredJdDTO structuredJd) {
+        if (structuredJd == null) {
+            return null;
+        }
+        return new StructuredJdDTO(
+                structuredJd.id(),
+                structuredJd.title(),
+                structuredJd.companyName(),
+                List.of(),
+                List.of(),
+                structuredJd.experienceRange(),
+                structuredJd.responsibilities(),
+                structuredJd.qualifications(),
+                structuredJd.workLocation(),
+                structuredJd.employmentType()
+        );
+    }
+
+    private ApplicantSummaryDTO toApplicantSummaryDto(CV cv) {
+        CandidateEvaluation evaluation = cv.getCandidateEvaluation();
+        MatchScore matchScore = evaluation == null ? null : evaluation.getMatchScore();
+        Double rawScore = matchScore == null ? null : matchScore.getOverallScore();
+        Double scoreAsPercent = rawScore == null
+                ? null
+                : Math.max(0.0, Math.min(rawScore > 10 ? rawScore : rawScore * 10, 100.0));
+        String candidateName = cv.getCandidate() == null
+                ? "Unknown candidate"
+                : (trimToNull((cv.getCandidate().getFirstName() + " " + cv.getCandidate().getLastName())) == null
+                ? "Unknown candidate"
+                : trimToNull(cv.getCandidate().getFirstName() + " " + cv.getCandidate().getLastName()));
+        String status = evaluation != null
+                ? evaluation.getStatus().name()
+                : cv.getStatus().name();
+
+        return new ApplicantSummaryDTO(
+                evaluation == null ? null : evaluation.getId(),
+                candidateName,
+                scoreAsPercent,
+                status,
+                cv.getUploadDate()
+        );
+    }
+
+    private List<String> normalizeTextList(List<String> values) {
+        if (values == null) {
+            return List.of();
+        }
+        return values.stream()
+                .map(this::trimToNull)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
     private void applyStructuredJdData(StructuredJd structuredJd, StructuredJdCallbackRequest request) {
         structuredJd.setTitle(request.title());
         String companyName = hasText(request.companyName()) ? request.companyName().trim() : appProperties.getCompanyName();
@@ -347,6 +510,14 @@ public class JobOfferService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }
 

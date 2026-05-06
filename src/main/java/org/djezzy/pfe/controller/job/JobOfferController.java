@@ -3,8 +3,11 @@ package org.djezzy.pfe.controller.job;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.djezzy.pfe.dto.system.ApiResponse;
+import org.djezzy.pfe.dto.job.ApplicantSummaryDTO;
 import org.djezzy.pfe.dto.job.CreateJobOfferRequest;
+import org.djezzy.pfe.dto.job.JobOfferDetailDTO;
 import org.djezzy.pfe.dto.job.JobOfferDTO;
+import org.djezzy.pfe.dto.job.ToggleJobOfferStatusRequest;
 import org.djezzy.pfe.dto.job.UpdateJobOfferRequest;
 import org.djezzy.pfe.model.job.JobOfferStatus;
 import org.djezzy.pfe.model.auth.User;
@@ -18,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -38,6 +42,11 @@ public class JobOfferController {
         return ResponseEntity.ok(ApiResponse.ok("Public job offers", jobOfferService.listPublicJobOffers()));
     }
 
+    @GetMapping("/api/job-offers/public/{jobOfferId}")
+    public ResponseEntity<ApiResponse<JobOfferDetailDTO>> publicOffer(@PathVariable Long jobOfferId) {
+        return ResponseEntity.ok(ApiResponse.ok("Public job offer details", jobOfferService.getPublicJobOffer(jobOfferId)));
+    }
+
     @GetMapping({"/api/hr/job-offers", "/api/rh/job-offers"})
     public ResponseEntity<ApiResponse<Page<JobOfferDTO>>> allOffers(
             @RequestParam(defaultValue = "0") int page,
@@ -48,6 +57,16 @@ public class JobOfferController {
     ) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ResponseEntity.ok(ApiResponse.ok("Job offers", jobOfferService.listHrJobOffers(pageable, location, dateCreated, status)));
+    }
+
+    @GetMapping({"/api/hr/job-offers/{jobOfferId}", "/api/rh/job-offers/{jobOfferId}"})
+    public ResponseEntity<ApiResponse<JobOfferDetailDTO>> getOffer(@PathVariable Long jobOfferId) {
+        return ResponseEntity.ok(ApiResponse.ok("Job offer details", jobOfferService.getJobOffer(jobOfferId)));
+    }
+
+    @GetMapping({"/api/hr/job-offers/{jobOfferId}/applicants", "/api/rh/job-offers/{jobOfferId}/applicants"})
+    public ResponseEntity<ApiResponse<List<ApplicantSummaryDTO>>> getApplicants(@PathVariable Long jobOfferId) {
+        return ResponseEntity.ok(ApiResponse.ok("Job offer applicants", jobOfferService.getJobApplicants(jobOfferId)));
     }
 
     @PostMapping({"/api/hr/job-offers", "/api/rh/job-offers"})
@@ -65,11 +84,19 @@ public class JobOfferController {
     }
 
     @PutMapping({"/api/hr/job-offers/{jobOfferId}", "/api/rh/job-offers/{jobOfferId}"})
-    public ResponseEntity<ApiResponse<JobOfferDTO>> updateOffer(
+    public ResponseEntity<ApiResponse<JobOfferDetailDTO>> updateOffer(
             @PathVariable Long jobOfferId,
             @Valid @RequestBody UpdateJobOfferRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.ok("Job offer updated", jobOfferService.updateJobOffer(jobOfferId, request)));
+    }
+
+    @PatchMapping({"/api/hr/job-offers/{jobOfferId}/status", "/api/rh/job-offers/{jobOfferId}/status"})
+    public ResponseEntity<ApiResponse<JobOfferDetailDTO>> toggleStatus(
+            @PathVariable Long jobOfferId,
+            @Valid @RequestBody ToggleJobOfferStatusRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok("Job offer status updated", jobOfferService.toggleJobStatus(jobOfferId, request.status())));
     }
 
     @DeleteMapping({"/api/hr/job-offers/{jobOfferId}", "/api/rh/job-offers/{jobOfferId}"})

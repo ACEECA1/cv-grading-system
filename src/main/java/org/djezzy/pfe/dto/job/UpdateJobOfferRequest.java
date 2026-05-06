@@ -1,20 +1,23 @@
 package org.djezzy.pfe.dto.job;
 
-import org.djezzy.pfe.dto.auth.*;
-import org.djezzy.pfe.dto.job.*;
-import org.djezzy.pfe.dto.evaluation.*;
-import org.djezzy.pfe.dto.system.*;
-
-import com.fasterxml.jackson.annotation.JsonAlias;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+
+import java.util.List;
 
 public record UpdateJobOfferRequest(
         @NotBlank @Size(max = 255) String title,
-        @NotBlank @Size(min = 20) @JsonAlias("rawDescription") String rawText
+        @NotNull @Valid StructuredJdUpdateRequest structuredJd
 ) {
+    public record StructuredJdUpdateRequest(
+            String workLocation,
+            String employmentType,
+            @Valid ExperienceRangeDTO experienceRange,
+            List<String> requiredSkills,
+            List<String> preferredSkills,
+            List<String> responsibilities
+    ) {
+    }
 }
-
-
-
-
