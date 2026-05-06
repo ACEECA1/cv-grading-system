@@ -15,6 +15,7 @@ import org.djezzy.pfe.model.evaluation.CandidateEvaluation;
 import org.djezzy.pfe.model.evaluation.EvaluationStatus;
 import org.djezzy.pfe.model.job.JobOffer;
 import org.djezzy.pfe.model.job.JobOfferStatus;
+import org.djezzy.pfe.model.job.StructuredJd;
 import org.djezzy.pfe.model.auth.RhApprovalStatus;
 import org.djezzy.pfe.model.auth.Role;
 import org.djezzy.pfe.model.auth.User;
@@ -392,6 +393,69 @@ class BackendFlowIntegrationTests {
     }
 
     @Test
+    void multiple_candidates_can_upload_cv_for_same_structured_jd_offer() throws Exception {
+        User admin = userDAO.findByUsername("admin").orElseThrow();
+
+        JobOffer offer = new JobOffer();
+        offer.setTitle("Shared Structured JD Offer");
+        offer.setRawText("A published backend role for multi-candidate upload testing.");
+        offer.setStatus(JobOfferStatus.PUBLISHED);
+        offer.setCreatedBy(admin);
+        offer.setJdRequestId(UUID.randomUUID().toString());
+        jobOfferDAO.save(offer);
+
+        StructuredJd structuredJd = new StructuredJd();
+        structuredJd.setTitle("Shared Backend Role");
+        structuredJd.setJobOffer(offer);
+        structuredJdDAO.save(structuredJd);
+        offer.setStructuredJd(structuredJd);
+        jobOfferDAO.save(offer);
+
+        String tokenOne = registerAndLoginCandidate(
+                "multi-upload-1@mail.test",
+                "multi_upload_1_" + UUID.randomUUID().toString().substring(0, 4),
+                "Password123"
+        );
+        String tokenTwo = registerAndLoginCandidate(
+                "multi-upload-2@mail.test",
+                "multi_upload_2_" + UUID.randomUUID().toString().substring(0, 4),
+                "Password123"
+        );
+
+        MockMultipartFile cvOne = new MockMultipartFile(
+                "file",
+                "candidate-one.pdf",
+                MediaType.APPLICATION_PDF_VALUE,
+                "candidate one content".getBytes(StandardCharsets.UTF_8)
+        );
+        MockMultipartFile cvTwo = new MockMultipartFile(
+                "file",
+                "candidate-two.pdf",
+                MediaType.APPLICATION_PDF_VALUE,
+                "candidate two content".getBytes(StandardCharsets.UTF_8)
+        );
+
+        mockMvc.perform(multipart("/api/candidate/job-offers/{jobOfferId}/cv", offer.getId())
+                        .file(cvOne)
+                        .header("Authorization", "Bearer " + tokenOne))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.cvStatus").value("UPLOADED"));
+
+        mockMvc.perform(multipart("/api/candidate/job-offers/{jobOfferId}/cv", offer.getId())
+                        .file(cvTwo)
+                        .header("Authorization", "Bearer " + tokenTwo))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.cvStatus").value("UPLOADED"));
+
+        Long evaluationsOnSameStructuredJd = jdbcTemplate.queryForObject(
+                "select count(*) from candidate_evaluations where structured_jd_id = ?",
+                Long.class,
+                structuredJd.getId()
+        );
+        assertThat(evaluationsOnSameStructuredJd).isEqualTo(2L);
+    }
+
+    @Test
     void evaluation_callback_accepts_extended_payload_and_maps_skill_arrays() throws Exception {
         User admin = userDAO.findByUsername("admin").orElseThrow();
 
@@ -499,6 +563,44 @@ class BackendFlowIntegrationTests {
         );
         assertThat(matchedCount).isEqualTo(4);
         assertThat(missingCount).isEqualTo(2);
+    }
+
+    private String registerAndLoginCandidate(String email, String username, String password) throws Exception {
+        mockMvc.perform(post("/api/auth/register/candidate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", username,
+                                "firstName", "Candidate",
+                                "lastName", "Test",
+                                "email", email,
+                                "password", password
+                        ))))
+                .andExpect(status().isOk());
+
+        User candidate = userDAO.findByEmail(email).orElseThrow();
+        String code = verificationCodeDAO.findTopByUserAndUsedFalseOrderByCreatedAtDesc(candidate).orElseThrow().getCode();
+
+        mockMvc.perform(post("/api/auth/verify")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "email", email,
+                                "code", code
+                        ))))
+                .andExpect(status().isOk());
+
+        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "usernameOrEmail", username,
+                                "password", password
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        return objectMapper.readTree(loginResult.getResponse().getContentAsString())
+                .path("data")
+                .path("accessToken")
+                .asText();
     }
 }
 

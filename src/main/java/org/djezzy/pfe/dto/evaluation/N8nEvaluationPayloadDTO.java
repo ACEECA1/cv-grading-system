@@ -11,6 +11,7 @@ import java.util.List;
 public record N8nEvaluationPayloadDTO(
         String status,
         @JsonProperty("processing_time") String processingTime,
+        @JsonAlias("profileData")
         @JsonProperty("profile_data") ProfileDataDTO profileData,
         @JsonProperty("match_score") MatchScoreDTO matchScore,
         @JsonProperty("technical_questions") List<TechnicalQuestionDTO> technicalQuestions,
@@ -18,14 +19,18 @@ public record N8nEvaluationPayloadDTO(
 ) {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ProfileDataDTO(
+            @JsonAlias("personalInfo")
             @JsonProperty("personal_info") PersonalInfoDTO personalInfo,
+            @JsonAlias("experience")
             List<ExperienceDTO> experiences,
             List<EducationDTO> education,
             List<String> skills,
             List<LanguageDTO> languages,
             List<CertificateDTO> certificates,
             List<String> hobbies,
+            @JsonAlias("contactInfo")
             @JsonProperty("contact_info") ContactInfoDTO contactInfo,
+            @JsonAlias("normalizedSkills")
             @JsonProperty("normalized_skills") List<NormalizedSkillDTO> normalizedSkills
     ) {
     }

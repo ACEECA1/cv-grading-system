@@ -1,6 +1,7 @@
 package org.djezzy.pfe.controller.evaluation;
 
 import lombok.RequiredArgsConstructor;
+import org.djezzy.pfe.dto.evaluation.HrEvaluationDetailDTO;
 import org.djezzy.pfe.dto.system.ApiResponse;
 import org.djezzy.pfe.dto.system.DashboardStatsDTO;
 import org.djezzy.pfe.dto.evaluation.HrEvaluationSummaryDTO;
@@ -42,6 +43,11 @@ public class HrController {
     ) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ResponseEntity.ok(ApiResponse.ok("Evaluations", hrService.listEvaluations(pageable, jobId, minScore)));
+    }
+
+    @GetMapping("/evaluations/{evaluationId}")
+    public ResponseEntity<ApiResponse<HrEvaluationDetailDTO>> getEvaluation(@PathVariable Long evaluationId) {
+        return ResponseEntity.ok(ApiResponse.ok("Evaluation details", hrService.getEvaluation(evaluationId)));
     }
 
     @GetMapping("/evaluations/{evaluationId}/cv/download")
