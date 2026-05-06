@@ -45,6 +45,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/mock/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/system/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/job-offers/public/**").permitAll()
+                        .requestMatchers("/api/users/**").authenticated()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/hr/**", "/api/rh/**").hasAnyRole("HR", "ADMIN")
                         .requestMatchers("/api/candidate/**").hasRole("CANDIDATE")
