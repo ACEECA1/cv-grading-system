@@ -17,5 +17,13 @@ public class EmailUtil {
         message.setText("Your verification code is: " + code + "\nThis code expires soon.");
         mailSender.send(message);
     }
+
+    public void sendPasswordResetCode(String toEmail, String code) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(toEmail);
+        message.setSubject("Password reset verification code");
+        message.setText("Your Djezzy Talent Portal verification code is: " + code + ". It expires in 15 minutes.");
+        mailSender.send(message);
+    }
 }
 

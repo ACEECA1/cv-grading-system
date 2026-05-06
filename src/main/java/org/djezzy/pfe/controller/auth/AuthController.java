@@ -4,11 +4,13 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.djezzy.pfe.dto.system.ApiResponse;
 import org.djezzy.pfe.dto.auth.AuthTokensDTO;
+import org.djezzy.pfe.dto.auth.ForgotPasswordRequest;
 import org.djezzy.pfe.dto.auth.LoginRequest;
 import org.djezzy.pfe.dto.auth.LogoutRequest;
 import org.djezzy.pfe.dto.auth.RefreshTokenRequest;
 import org.djezzy.pfe.dto.auth.RegisterCandidateRequest;
 import org.djezzy.pfe.dto.auth.RegisterHrRequest;
+import org.djezzy.pfe.dto.auth.ResetPasswordRequest;
 import org.djezzy.pfe.dto.auth.ResendCodeRequest;
 import org.djezzy.pfe.dto.auth.UserDTO;
 import org.djezzy.pfe.dto.auth.VerifyCodeRequest;
@@ -47,6 +49,18 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> resendVerification(@Valid @RequestBody ResendCodeRequest request) {
         authService.resendCode(request);
         return ResponseEntity.ok(ApiResponse.ok("Verification code resent", null));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.requestPasswordReset(request);
+        return ResponseEntity.ok(ApiResponse.ok("Password reset code sent", null));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok(ApiResponse.ok("Password reset successful", null));
     }
 
     @PostMapping("/login")

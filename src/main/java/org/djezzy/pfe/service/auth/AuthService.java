@@ -4,20 +4,24 @@ import lombok.RequiredArgsConstructor;
 import org.djezzy.pfe.config.AppProperties;
 import org.djezzy.pfe.dao.auth.CandidateDAO;
 import org.djezzy.pfe.dao.auth.HRPersonDAO;
+import org.djezzy.pfe.dao.auth.PasswordResetTokenDAO;
 import org.djezzy.pfe.dao.auth.RefreshTokenDAO;
 import org.djezzy.pfe.dao.auth.UserDAO;
 import org.djezzy.pfe.dao.auth.VerificationCodeDAO;
 import org.djezzy.pfe.dto.auth.AuthTokensDTO;
+import org.djezzy.pfe.dto.auth.ForgotPasswordRequest;
 import org.djezzy.pfe.dto.auth.LoginRequest;
 import org.djezzy.pfe.dto.auth.LogoutRequest;
 import org.djezzy.pfe.dto.auth.RefreshTokenRequest;
 import org.djezzy.pfe.dto.auth.RegisterCandidateRequest;
 import org.djezzy.pfe.dto.auth.RegisterHrRequest;
+import org.djezzy.pfe.dto.auth.ResetPasswordRequest;
 import org.djezzy.pfe.dto.auth.ResendCodeRequest;
 import org.djezzy.pfe.dto.auth.UserDTO;
 import org.djezzy.pfe.dto.auth.VerifyCodeRequest;
 import org.djezzy.pfe.model.auth.Candidate;
 import org.djezzy.pfe.model.auth.HRPerson;
+import org.djezzy.pfe.model.auth.PasswordResetToken;
 import org.djezzy.pfe.model.auth.RefreshToken;
 import org.djezzy.pfe.model.auth.RhApprovalStatus;
 import org.djezzy.pfe.model.auth.Role;
@@ -35,16 +39,20 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.time.Instant;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+    private static final int PASSWORD_RESET_EXPIRY_MINUTES = 15;
+
     private final UserDAO userDAO;
     private final CandidateDAO candidateDAO;
     private final HRPersonDAO hrPersonDAO;
     private final VerificationCodeDAO verificationCodeDAO;
+    private final PasswordResetTokenDAO passwordResetTokenDAO;
     private final RefreshTokenDAO refreshTokenDAO;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
@@ -111,6 +119,40 @@ public class AuthService {
         User user = userDAO.findByEmail(request.email())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
         issueVerificationCode(user);
+    }
+
+    @Transactional
+    public void requestPasswordReset(ForgotPasswordRequest request) {
+        User user = userDAO.findByEmail(request.email())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
+
+        String resetCode = codeGeneratorUtil.numericCode(6);
+        PasswordResetToken passwordResetToken = passwordResetTokenDAO.findByUser(user)
+                .orElseGet(PasswordResetToken::new);
+        passwordResetToken.setUser(user);
+        passwordResetToken.setToken(resetCode);
+        passwordResetToken.setExpiryDate(LocalDateTime.now().plusMinutes(PASSWORD_RESET_EXPIRY_MINUTES));
+        passwordResetTokenDAO.save(passwordResetToken);
+
+        emailUtil.sendPasswordResetCode(user.getEmail(), resetCode);
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        User user = userDAO.findByEmail(request.email())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
+
+        PasswordResetToken passwordResetToken = passwordResetTokenDAO.findByUserAndToken(user, request.code())
+                .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "Invalid verification code"));
+
+        if (passwordResetToken.isExpired()) {
+            passwordResetTokenDAO.delete(passwordResetToken);
+            throw new AppException(HttpStatus.BAD_REQUEST, "Verification code expired");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
+        userDAO.save(user);
+        passwordResetTokenDAO.delete(passwordResetToken);
     }
 
     @Transactional
