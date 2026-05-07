@@ -82,7 +82,8 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(List.of(
             "http://localhost:5173",
             "http://127.0.0.1:5173",
-            "http://192.168.100.3:5173"
+            "http://192.168.100.3:5173",
+            "https://cv-grading-system-frontend.vercel.app"
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
