@@ -3,6 +3,7 @@ package org.djezzy.pfe.util;
 import lombok.RequiredArgsConstructor;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Component;
 public class EmailUtil {
     private final JavaMailSender mailSender;
 
+    @Async("applicationTaskExecutor")
     public void sendVerificationCode(String toEmail, String code) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmail);
@@ -18,6 +20,7 @@ public class EmailUtil {
         mailSender.send(message);
     }
 
+    @Async("applicationTaskExecutor")
     public void sendPasswordResetCode(String toEmail, String code) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmail);

@@ -40,6 +40,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()
+                        .requestMatchers("/health").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/callbacks/**").permitAll()
                         .requestMatchers("/api/mock/**").permitAll()
@@ -89,6 +90,11 @@ public class SecurityConfig {
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        CorsConfiguration healthCheckConfig = new CorsConfiguration();
+        healthCheckConfig.setAllowedOriginPatterns(List.of("*"));
+        healthCheckConfig.setAllowedMethods(List.of("GET", "HEAD"));
+        healthCheckConfig.setAllowedHeaders(List.of("*"));
+        source.registerCorsConfiguration("/health", healthCheckConfig);
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
