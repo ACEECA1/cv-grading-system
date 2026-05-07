@@ -1,9 +1,5 @@
 package org.djezzy.pfe.model.auth;
 
-import org.djezzy.pfe.model.auth.*;
-import org.djezzy.pfe.model.job.*;
-import org.djezzy.pfe.model.evaluation.*;
-import org.djezzy.pfe.model.system.*;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
