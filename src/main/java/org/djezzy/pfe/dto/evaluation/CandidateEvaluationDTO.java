@@ -9,7 +9,6 @@ public record CandidateEvaluationDTO(
         Long id,
         EvaluationStatus status,
         Double overallScore,
-        String detailsJson,
         String recommendation,
         String reasoning,
         List<String> matchedSkills,

@@ -12,7 +12,6 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
@@ -49,9 +48,6 @@ public class CandidateEvaluation extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private EvaluationStatus status;
-
-    @Lob
-    private String detailsJson;
 
     public void clearTechnicalQuestions() {
         technicalQuestions.clear();

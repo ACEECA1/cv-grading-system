@@ -13,7 +13,6 @@ import java.util.List;
 public record EvaluationCallbackRequest(
         @NotNull EvaluationStatus status,
         Double overallScore,
-        String detailsJson,
         @JsonAlias("evaluationId") Long candidateEvaluationId,
         @JsonAlias("match_score") MatchScoreDTO matchScore,
         @JsonAlias("profile_data") ProfileDataDTO profileData,

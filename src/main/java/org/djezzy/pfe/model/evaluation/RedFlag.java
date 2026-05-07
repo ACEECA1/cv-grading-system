@@ -25,10 +25,6 @@ public class RedFlag extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "hr_question_id", nullable = false)
     private HRQuestion hrQuestion;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "candidate_evaluation_id")
-    private CandidateEvaluation candidateEvaluation;
 }
 
 

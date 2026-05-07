@@ -63,7 +63,6 @@ public class CandidateService {
         evaluation.setCv(cv);
         evaluation.setStructuredJd(jobOffer.getStructuredJd());
         evaluation.setStatus(EvaluationStatus.WAITING);
-        evaluation.setDetailsJson("{}");
         candidateEvaluationDAO.save(evaluation);
         cv.setCandidateEvaluation(evaluation);
         cvdao.save(cv);

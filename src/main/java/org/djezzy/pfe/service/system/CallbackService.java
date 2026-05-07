@@ -349,8 +349,8 @@ public class CallbackService {
             hrQuestion.setPsychologicalIntent(payload.psychologicalIntent());
             hrQuestion.setEvaluationCriteria(payload.evaluationCriteria());
             mapIdealResponseIndicators(hrQuestion, payload.idealResponseIndicators());
-            mapRedFlags(hrQuestion, evaluation, payload.redFlags());
-            mapFollowUpProbes(hrQuestion, evaluation, payload.followUpProbes());
+            mapRedFlags(hrQuestion, payload.redFlags());
+            mapFollowUpProbes(hrQuestion, payload.followUpProbes());
             evaluation.addHrQuestion(hrQuestion);
         }
     }
@@ -370,7 +370,7 @@ public class CallbackService {
         }
     }
 
-    private void mapRedFlags(HRQuestion hrQuestion, CandidateEvaluation evaluation, List<String> redFlags) {
+    private void mapRedFlags(HRQuestion hrQuestion, List<String> redFlags) {
         hrQuestion.clearRedFlags();
         if (redFlags == null) {
             return;
@@ -381,12 +381,11 @@ public class CallbackService {
             }
             RedFlag redFlag = new RedFlag();
             redFlag.setText(text.trim());
-            redFlag.setCandidateEvaluation(evaluation);
             hrQuestion.addRedFlag(redFlag);
         }
     }
 
-    private void mapFollowUpProbes(HRQuestion hrQuestion, CandidateEvaluation evaluation, List<String> probes) {
+    private void mapFollowUpProbes(HRQuestion hrQuestion, List<String> probes) {
         hrQuestion.clearFollowUpProbes();
         if (probes == null) {
             return;
@@ -397,7 +396,6 @@ public class CallbackService {
             }
             FollowUpProbe followUpProbe = new FollowUpProbe();
             followUpProbe.setText(text.trim());
-            followUpProbe.setCandidateEvaluation(evaluation);
             hrQuestion.addFollowUpProbe(followUpProbe);
         }
     }

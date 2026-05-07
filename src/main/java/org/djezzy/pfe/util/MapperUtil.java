@@ -99,7 +99,6 @@ public class MapperUtil {
                 evaluation.getId(),
                 evaluation.getStatus(),
                 overallScore,
-                evaluation.getDetailsJson(),
                 recommendation,
                 reasoning,
                 matchedSkills,

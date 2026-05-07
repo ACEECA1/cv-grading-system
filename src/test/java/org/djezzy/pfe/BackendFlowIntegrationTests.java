@@ -491,7 +491,6 @@ class BackendFlowIntegrationTests {
         evaluation.setCv(cv);
         evaluation.setStructuredJd(offer.getStructuredJd());
         evaluation.setStatus(EvaluationStatus.WAITING);
-        evaluation.setDetailsJson("{}");
         candidateEvaluationDAO.save(evaluation);
         cv.setCandidateEvaluation(evaluation);
         cvdao.save(cv);
