@@ -18,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -70,6 +71,7 @@ public class JobOfferController {
     }
 
     @PostMapping({"/api/hr/job-offers", "/api/rh/job-offers"})
+    @PreAuthorize("hasAnyRole('HR','ADMIN')")
     public ResponseEntity<ApiResponse<JobOfferDTO>> createOffer(
             @Valid @RequestBody CreateJobOfferRequest request,
             Authentication authentication
@@ -79,11 +81,13 @@ public class JobOfferController {
     }
 
     @PostMapping({"/api/hr/job-offers/{jobOfferId}/retry", "/api/rh/job-offers/{jobOfferId}/retry"})
+    @PreAuthorize("hasAnyRole('HR','ADMIN')")
     public ResponseEntity<ApiResponse<JobOfferDTO>> retryOffer(@PathVariable Long jobOfferId) {
         return ResponseEntity.ok(ApiResponse.ok("Retry started", jobOfferService.retryJobDescriptionProcessing(jobOfferId)));
     }
 
     @PutMapping({"/api/hr/job-offers/{jobOfferId}", "/api/rh/job-offers/{jobOfferId}"})
+    @PreAuthorize("hasAnyRole('HR','ADMIN')")
     public ResponseEntity<ApiResponse<JobOfferDetailDTO>> updateOffer(
             @PathVariable Long jobOfferId,
             @Valid @RequestBody UpdateJobOfferRequest request
@@ -92,6 +96,7 @@ public class JobOfferController {
     }
 
     @PatchMapping({"/api/hr/job-offers/{jobOfferId}/status", "/api/rh/job-offers/{jobOfferId}/status"})
+    @PreAuthorize("hasAnyRole('HR','ADMIN')")
     public ResponseEntity<ApiResponse<JobOfferDetailDTO>> toggleStatus(
             @PathVariable Long jobOfferId,
             @Valid @RequestBody ToggleJobOfferStatusRequest request
@@ -100,6 +105,7 @@ public class JobOfferController {
     }
 
     @DeleteMapping({"/api/hr/job-offers/{jobOfferId}", "/api/rh/job-offers/{jobOfferId}"})
+    @PreAuthorize("hasAnyRole('HR','ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteOffer(@PathVariable Long jobOfferId) {
         jobOfferService.deleteJobOffer(jobOfferId);
         return ResponseEntity.ok(ApiResponse.ok("Job offer deleted", null));
