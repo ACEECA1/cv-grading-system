@@ -71,9 +71,17 @@ public class AsyncWorkflowService {
             log.warn("Evaluation {} does not match CV {}", evaluationId, cvId);
             return;
         }
+        if (isSubmissionWithdrawn(cvId, evaluationId)) {
+            log.info("Skipping evaluation workflow for withdrawn submission CV {} / evaluation {}", cvId, evaluationId);
+            return;
+        }
 
         try {
             OcrService.OcrResult ocrResult = ocrService.extractTextFromPdf(Path.of(cv.getFileUrl()));
+            if (isSubmissionWithdrawn(cvId, evaluationId)) {
+                log.info("Submission CV {} / evaluation {} was withdrawn before OCR save", cvId, evaluationId);
+                return;
+            }
             cv.setRawText(ocrResult.rawText());
             cv.setOcrPayloadJson(ocrResult.payloadJson());
             cv.setStatus(CVProcessingStatus.OCR_DONE);
@@ -85,6 +93,10 @@ public class AsyncWorkflowService {
                     "cv_text", ocrResult.rawText(),
                     "job_description", jobDescriptionJson
             );
+            if (isSubmissionWithdrawn(cvId, evaluationId)) {
+                log.info("Submission CV {} / evaluation {} was withdrawn before webhook dispatch", cvId, evaluationId);
+                return;
+            }
             webClient.post()
                     .uri(appProperties.getN8n().getEvaluationUrl())
                     .contentType(MediaType.APPLICATION_JSON)
@@ -93,21 +105,37 @@ public class AsyncWorkflowService {
                     .toBodilessEntity()
                     .doOnError(error -> log.error("Failed to dispatch evaluation webhook for CV {}", cvId, error))
                     .subscribe();
+            if (isSubmissionWithdrawn(cvId, evaluationId)) {
+                log.info("Submission CV {} / evaluation {} was withdrawn before status update", cvId, evaluationId);
+                return;
+            }
             cv.setStatus(CVProcessingStatus.SENT_FOR_EVALUATION);
             cvdao.save(cv);
         } catch (JsonProcessingException ex) {
+            if (isSubmissionWithdrawn(cvId, evaluationId)) {
+                log.info("Skipping failure state update for withdrawn submission CV {} / evaluation {}", cvId, evaluationId);
+                return;
+            }
             cv.setStatus(CVProcessingStatus.FAILED);
             evaluation.setStatus(EvaluationStatus.FAILED);
             cvdao.save(cv);
             candidateEvaluationDAO.save(evaluation);
             log.error("Failed to serialize workflow payload", ex);
         } catch (AppException ex) {
+            if (isSubmissionWithdrawn(cvId, evaluationId)) {
+                log.info("Skipping failure state update for withdrawn submission CV {} / evaluation {}", cvId, evaluationId);
+                return;
+            }
             cv.setStatus(CVProcessingStatus.FAILED);
             evaluation.setStatus(EvaluationStatus.FAILED);
             cvdao.save(cv);
             candidateEvaluationDAO.save(evaluation);
             log.error("CV processing failed", ex);
         }
+    }
+
+    private boolean isSubmissionWithdrawn(Long cvId, Long evaluationId) {
+        return !cvdao.existsById(cvId) || !candidateEvaluationDAO.existsById(evaluationId);
     }
 
     private String buildJobDescriptionJson(JobOffer jobOffer) throws JsonProcessingException {

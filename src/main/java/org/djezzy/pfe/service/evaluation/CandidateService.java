@@ -85,8 +85,8 @@ public class CandidateService {
     }
 
     @Transactional(readOnly = true)
-    public Page<JobOfferDTO> browseJobOffers(Pageable pageable, String location) {
-        return jobOfferService.listPublicJobOffers(pageable, location);
+    public Page<JobOfferDTO> browseJobOffers(String title, String location, Pageable pageable) {
+        return jobOfferService.getPublishedJobOffers(title, location, pageable);
     }
 
     @Transactional(readOnly = true)

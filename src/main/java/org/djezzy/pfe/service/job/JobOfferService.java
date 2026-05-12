@@ -179,16 +179,12 @@ public class JobOfferService {
 
     @Transactional(readOnly = true)
     public Page<JobOfferDTO> listPublicJobOffers(Pageable pageable, String location) {
-        Specification<JobOffer> specification = Specification.where((root, query, cb) -> cb.equal(root.get("status"), JobOfferStatus.PUBLISHED));
-        if (location != null && !location.isBlank()) {
-            specification = specification.and((root, query, cb) ->
-                    cb.like(
-                            cb.lower(root.join("structuredJd", jakarta.persistence.criteria.JoinType.LEFT).get("workLocation")),
-                            "%" + location.toLowerCase() + "%"
-                    )
-            );
-        }
-        return jobOfferDAO.findAll(specification, pageable).map(this::toPublicJobOfferDto);
+        return getPublishedJobOffers(null, location, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<JobOfferDTO> getPublishedJobOffers(String title, String location, Pageable pageable) {
+        return jobOfferDAO.findAllByFilters(title, location, true, pageable).map(this::toPublicJobOfferDto);
     }
 
     @Transactional(readOnly = true)
@@ -401,12 +397,12 @@ public class JobOfferService {
         return new JobOfferDTO(
                 dto.id(),
                 dto.title(),
-                dto.rawText(),
+                null,
                 dto.status(),
-                dto.jdRequestId(),
+                null,
                 sanitizeStructuredJdForPublic(dto.structuredJd()),
                 dto.createdAt(),
-                dto.updatedAt()
+                null
         );
     }
 

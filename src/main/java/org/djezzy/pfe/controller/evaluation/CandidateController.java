@@ -7,15 +7,19 @@ import org.djezzy.pfe.dto.job.JobOfferDTO;
 import org.djezzy.pfe.dto.evaluation.UploadCvResponseDTO;
 import org.djezzy.pfe.model.auth.User;
 import org.djezzy.pfe.service.evaluation.CandidateService;
+import org.djezzy.pfe.util.AppException;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,13 +40,28 @@ public class CandidateController {
     private final CandidateService candidateService;
 
     @GetMapping("/job-offers")
+    @PreAuthorize("hasRole('CANDIDATE')")
     public ResponseEntity<ApiResponse<Page<JobOfferDTO>>> browseOffers(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String location
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) String location,
+            @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false) String sortDir
     ) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        return ResponseEntity.ok(ApiResponse.ok("Job offers", candidateService.browseJobOffers(pageable, location)));
+        Pageable effectivePageable = pageable;
+        if ((sortBy != null && !sortBy.isBlank()) || (sortDir != null && !sortDir.isBlank())) {
+            Sort.Direction direction = Sort.Direction.DESC;
+            if (sortDir != null && !sortDir.isBlank()) {
+                try {
+                    direction = Sort.Direction.fromString(sortDir);
+                } catch (IllegalArgumentException ex) {
+                    throw new AppException(HttpStatus.BAD_REQUEST, "Invalid sort direction. Use 'asc' or 'desc'.");
+                }
+            }
+            String sortProperty = (sortBy == null || sortBy.isBlank()) ? "createdAt" : sortBy;
+            effectivePageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(direction, sortProperty));
+        }
+        return ResponseEntity.ok(ApiResponse.ok("Job offers", candidateService.browseJobOffers(title, location, effectivePageable)));
     }
 
     @PostMapping("/job-offers/{jobOfferId}/cv")
