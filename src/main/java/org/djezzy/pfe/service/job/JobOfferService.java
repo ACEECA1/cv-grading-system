@@ -31,7 +31,9 @@ import org.djezzy.pfe.util.AppException;
 import org.djezzy.pfe.util.MapperUtil;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Async;
@@ -192,6 +194,27 @@ public class JobOfferService {
     @Transactional(readOnly = true)
     public List<JobOfferDTO> listAllJobOffers() {
         return mapperUtil.toJobOfferDtos(jobOfferDAO.findAll());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<JobOfferDTO> getJobOffers(
+            String title,
+            String location,
+            Boolean isPublished,
+            int page,
+            int size,
+            String sortBy,
+            String sortDir
+    ) {
+        Sort.Direction direction;
+        try {
+            direction = Sort.Direction.fromString(sortDir);
+        } catch (IllegalArgumentException ex) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Invalid sort direction. Use 'asc' or 'desc'.");
+        }
+        String sortProperty = (sortBy == null || sortBy.isBlank()) ? "createdAt" : sortBy;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortProperty));
+        return jobOfferDAO.findAllByFilters(title, location, isPublished, pageable).map(mapperUtil::toJobOfferDto);
     }
 
     @Transactional(readOnly = true)
