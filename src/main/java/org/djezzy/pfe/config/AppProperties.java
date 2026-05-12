@@ -5,6 +5,8 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Getter
 @Setter
 @Component
@@ -14,6 +16,7 @@ public class AppProperties {
     private Ocr ocr = new Ocr();
     private String fileUploadDir;
     private String companyName;
+    private List<String> frontendUrls;
     private Callback callback = new Callback();
     private N8n n8n = new N8n();
     private Openrouter openrouter = new Openrouter();
@@ -60,4 +63,3 @@ public class AppProperties {
         private String password;
     }
 }
-
