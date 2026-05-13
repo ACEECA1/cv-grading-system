@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
@@ -40,9 +39,12 @@ import java.util.regex.Pattern;
 public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
     private static final Pattern THINK_TAGS_PATTERN = Pattern.compile("(?s)<think>.*?</think>");
     private static final Pattern JSON_OBJECT_PATTERN = Pattern.compile("\\{[\\s\\S]*}");
-    private static final Pattern EMAIL_PATTERN = Pattern.compile("\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b");
-    private static final Pattern PHONE_PATTERN = Pattern.compile("(?:\\+?\\d{1,3}[-.\\s]?)?(?:\\(?\\d{1,4}\\)?[-.\\s]?)?\\d{1,4}[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,9}");
-    private static final Pattern LINKEDIN_PATTERN = Pattern.compile("(?:https?://)?(?:www\\.)?linkedin\\.com/in/[A-Za-z0-9_-]+/?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern EMAIL_PATTERN = Pattern
+            .compile("\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b");
+    private static final Pattern PHONE_PATTERN = Pattern
+            .compile("(?:\\+?\\d{1,3}[-.\\s]?)?(?:\\(?\\d{1,4}\\)?[-.\\s]?)?\\d{1,4}[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,9}");
+    private static final Pattern LINKEDIN_PATTERN = Pattern
+            .compile("(?:https?://)?(?:www\\.)?linkedin\\.com/in/[A-Za-z0-9_-]+/?", Pattern.CASE_INSENSITIVE);
 
     private static final String CV_PARSER_PROMPT = """
             # Role & Persona
@@ -63,17 +65,43 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
     private static final String MATCHING_PROMPT = """
             You are a Senior Talent Matching Analyst.
             Return only valid JSON with root key "match_score" containing:
-            overall_score, matched_skills, missing_skills, experience_alignment, education_match, recommendation, reasoning.
+            "overall_match_score": <number strictly between 0.0 and 10.0, e.g., 8.5>,
+            matched_skills, missing_skills, experience_alignment, education_match, recommendation, reasoning.
+            The overall_match_score MUST be a decimal number from 0.0 to 10.0. Never exceed 10 or go below 0.
             """;
 
     private static final String TECHNICAL_PROMPT = """
             You are a Senior Technical Interview Architect.
-            Return only valid JSON with root key "technical_questions".
+            You must return ONLY valid JSON. Your response must strictly contain an array of objects under the key "technical_questions" matching this exact schema:
+            {
+              "technical_questions": [
+                {
+                  "question": "<The technical question>",
+                  "expected_answer": "<The expected correct answer>",
+                  "difficulty": "<Beginner/Intermediate/Advanced/Expert>",
+                  "skill_area": "<The specific skill being tested>",
+                  "bluff_indicator": <boolean: true if this question is designed to catch candidates exaggerating their skills>,
+                  "follow_up_questions": ["<follow up 1>", "<follow up 2>"]
+                }
+              ]
+            }
             """;
 
     private static final String HR_PROMPT = """
             You are an HR Behavioral Interview Specialist.
-            Return only valid JSON with root key "hr_questions".
+            You must return ONLY valid JSON. Your response must strictly contain an array of objects under the key "hr_questions" matching this exact schema:
+            {
+              "hr_questions": [
+                {
+                  "question": "<The behavioral/HR question>",
+                  "psychological_intent": "<What this question is actually trying to reveal about the candidate>",
+                  "evaluation_criteria": "<How to grade the candidate's answer>",
+                  "ideal_response_indicators": ["<indicator 1>", "<indicator 2>"],
+                  "red_flags": ["<warning sign 1>", "<warning sign 2>"],
+                  "follow_up_probes": ["<probe 1>", "<probe 2>"]
+                }
+              ]
+            }
             """;
 
     private final WebClient webClient;
@@ -107,7 +135,8 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                 input.evaluationId());
 
         try {
-            JsonNode profileData = timedStage("CV Parsing", input.evaluationId(), () -> requestCvParser(input.cvText()));
+            JsonNode profileData = timedStage("CV Parsing", input.evaluationId(),
+                    () -> requestCvParser(input.cvText()));
             ObjectNode combinedPayload = timedStage("Combine CV + Job Description", input.evaluationId(), () -> {
                 ObjectNode payload = objectMapper.createObjectNode();
                 payload.set("cv", profileData);
@@ -118,22 +147,28 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
             ConcurrentHashMap<String, Object> stageResults = new ConcurrentHashMap<>();
 
             CompletableFuture<Void> consistencyFuture = CompletableFuture
-                    .supplyAsync(() -> timedStage("Consistency Validation", input.evaluationId(), () -> requestConsistencyCheck(combinedPayload)), workflowProcessorExecutor)
+                    .supplyAsync(() -> timedStage("Consistency Validation", input.evaluationId(),
+                            () -> requestConsistencyCheck(combinedPayload)), workflowProcessorExecutor)
                     .thenAccept(result -> {
                         stageResults.put("consistency", result);
-                        log.debug("[{}][evaluationId={}] Consistency Validation result stored", Thread.currentThread().getName(), input.evaluationId());
+                        log.debug("[{}][evaluationId={}] Consistency Validation result stored",
+                                Thread.currentThread().getName(), input.evaluationId());
                     });
             CompletableFuture<Void> skillsFuture = CompletableFuture
-                    .supplyAsync(() -> timedStage("Skills Taxonomy", input.evaluationId(), () -> requestSkillsNormalization(combinedPayload)), workflowProcessorExecutor)
+                    .supplyAsync(() -> timedStage("Skills Taxonomy", input.evaluationId(),
+                            () -> requestSkillsNormalization(combinedPayload)), workflowProcessorExecutor)
                     .thenAccept(result -> {
                         stageResults.put("skills", result);
-                        log.debug("[{}][evaluationId={}] Skills Taxonomy result stored", Thread.currentThread().getName(), input.evaluationId());
+                        log.debug("[{}][evaluationId={}] Skills Taxonomy result stored",
+                                Thread.currentThread().getName(), input.evaluationId());
                     });
             CompletableFuture<Void> contactFuture = CompletableFuture
-                    .supplyAsync(() -> timedStage("Personal Info Extraction", input.evaluationId(), () -> extractContactInfo(input.cvText())), workflowProcessorExecutor)
+                    .supplyAsync(() -> timedStage("Personal Info Extraction", input.evaluationId(),
+                            () -> extractContactInfo(input.cvText())), workflowProcessorExecutor)
                     .thenAccept(result -> {
                         stageResults.put("contact", result);
-                        log.debug("[{}][evaluationId={}] Personal Info Extraction result stored", Thread.currentThread().getName(), input.evaluationId());
+                        log.debug("[{}][evaluationId={}] Personal Info Extraction result stored",
+                                Thread.currentThread().getName(), input.evaluationId());
                     });
 
             timedStage("Parallel Validation Bundle Join", input.evaluationId(), () -> {
@@ -143,7 +178,8 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
 
             JsonNode consistencyResult = (JsonNode) stageResults.get("consistency");
             JsonNode skillsResult = (JsonNode) stageResults.get("skills");
-            N8nEvaluationPayloadDTO.ContactInfoDTO contactInfo = (N8nEvaluationPayloadDTO.ContactInfoDTO) stageResults.get("contact");
+            N8nEvaluationPayloadDTO.ContactInfoDTO contactInfo = (N8nEvaluationPayloadDTO.ContactInfoDTO) stageResults
+                    .get("contact");
 
             ObjectNode profileWithExtras = timedStage("Profile Enrichment", input.evaluationId(), () -> {
                 ObjectNode enriched = asObjectNode(profileData).deepCopy();
@@ -171,19 +207,24 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                 return payload;
             });
 
-            JsonNode matchingResult = timedStage("Matching Engine", input.evaluationId(), () -> requestMatching(matchingInput));
+            JsonNode matchingResult = timedStage("Matching Engine", input.evaluationId(),
+                    () -> requestMatching(matchingInput));
 
             CompletableFuture<Void> technicalFuture = CompletableFuture
-                    .supplyAsync(() -> timedStage("Technical Questions Generation", input.evaluationId(), () -> requestTechnicalQuestions(matchingResult)), workflowProcessorExecutor)
+                    .supplyAsync(() -> timedStage("Technical Questions Generation", input.evaluationId(),
+                            () -> requestTechnicalQuestions(matchingResult)), workflowProcessorExecutor)
                     .thenAccept(result -> {
                         stageResults.put("technical", result);
-                        log.debug("[{}][evaluationId={}] Technical Questions result stored", Thread.currentThread().getName(), input.evaluationId());
+                        log.debug("[{}][evaluationId={}] Technical Questions result stored",
+                                Thread.currentThread().getName(), input.evaluationId());
                     });
             CompletableFuture<Void> hrFuture = CompletableFuture
-                    .supplyAsync(() -> timedStage("HR Questions Generation", input.evaluationId(), () -> requestHrQuestions(matchingResult)), workflowProcessorExecutor)
+                    .supplyAsync(() -> timedStage("HR Questions Generation", input.evaluationId(),
+                            () -> requestHrQuestions(matchingResult)), workflowProcessorExecutor)
                     .thenAccept(result -> {
                         stageResults.put("hr", result);
-                        log.debug("[{}][evaluationId={}] HR Questions result stored", Thread.currentThread().getName(), input.evaluationId());
+                        log.debug("[{}][evaluationId={}] HR Questions result stored", Thread.currentThread().getName(),
+                                input.evaluationId());
                     });
 
             timedStage("Parallel QA Bundle Join", input.evaluationId(), () -> {
@@ -194,20 +235,19 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
             JsonNode technicalResult = (JsonNode) stageResults.get("technical");
             JsonNode hrResult = (JsonNode) stageResults.get("hr");
 
-            ObjectNode finalResponse = timedStage("Final Response Assembly", input.evaluationId(), () -> buildFinalResponse(
-                    startedAt,
-                    profileWithExtras,
-                    consistencyResult,
-                    matchingResult,
-                    technicalResult,
-                    hrResult
-            ));
+            ObjectNode finalResponse = timedStage("Final Response Assembly", input.evaluationId(),
+                    () -> buildFinalResponse(
+                            startedAt,
+                            profileWithExtras,
+                            consistencyResult,
+                            matchingResult,
+                            technicalResult,
+                            hrResult));
 
             N8nEvaluationPayloadDTO callbackPayload = timedStage(
                     "Callback Payload Mapping",
                     input.evaluationId(),
-                    () -> objectMapper.convertValue(finalResponse, N8nEvaluationPayloadDTO.class)
-            );
+                    () -> objectMapper.convertValue(finalResponse, N8nEvaluationPayloadDTO.class));
 
             try {
                 timedStage("Evaluation Callback Dispatch", input.evaluationId(), () -> {
@@ -247,8 +287,7 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
             JsonNode consistencyResult,
             JsonNode matchingResult,
             JsonNode technicalResult,
-            JsonNode hrResult
-    ) {
+            JsonNode hrResult) {
         ObjectNode response = objectMapper.createObjectNode();
         response.put("status", "success");
         response.put("processing_time", String.format("%.2fs", (System.currentTimeMillis() - startedAt) / 1000.0));
@@ -274,6 +313,7 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
             return objectMapper.createObjectNode();
         }
         ObjectNode normalized = asObjectNode(rawMatchScore).deepCopy();
+        clampOverallScore(normalized);
         ArrayNode matchedSkills = objectMapper.createArrayNode();
         JsonNode sourceSkills = normalized.path("matched_skills");
         if (sourceSkills.isArray()) {
@@ -308,6 +348,20 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
         return normalized;
     }
 
+    private void clampOverallScore(ObjectNode node) {
+        Double parsedScore = parseDouble(node.path("overall_score"));
+        if (parsedScore == null) {
+            parsedScore = parseDouble(node.path("overall_match_score"));
+        }
+        double finalScore = parsedScore == null ? 0.0 : parsedScore;
+        if (finalScore > 10.0) {
+            finalScore = finalScore / 10.0;
+        }
+        finalScore = Math.min(Math.max(finalScore, 0.0), 10.0);
+        node.put("overall_score", Math.round(finalScore * 100.0) / 100.0);
+        node.remove("overall_match_score");
+    }
+
     private ArrayNode normalizeMissingSkills(JsonNode source) {
         ArrayNode normalizedMissing = objectMapper.createArrayNode();
         if (source == null || source.isNull() || !source.isArray()) {
@@ -328,8 +382,7 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                 String skillName = firstNonBlank(
                         item.path("skill_name").asText(null),
                         item.path("normalized_name").asText(null),
-                        item.path("original_name").asText(null)
-                );
+                        item.path("original_name").asText(null));
                 if (isBlank(skillName)) {
                     continue;
                 }
@@ -447,30 +500,32 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
     }
 
     private JsonNode requestCvParser(String cvText) {
-        return callOpenRouterJson("CV Parsing", CV_PARSER_PROMPT, toJson(cvText), 0.2, 30000);
+        return callOpenRouterJson("CV Parsing", CV_PARSER_PROMPT, toJson(cvText), 0.2, 30000, false);
     }
 
     private JsonNode requestConsistencyCheck(JsonNode input) {
-        return callOpenRouterJson("Consistency Validation", CONSISTENCY_PROMPT, toJsonTwice(input), 0.2, 30000);
+        return callOpenRouterJson("Consistency Validation", CONSISTENCY_PROMPT, toJsonTwice(input), 0.2, 30000, false);
     }
 
     private JsonNode requestSkillsNormalization(JsonNode input) {
-        return callOpenRouterJson("Skills Taxonomy", SKILLS_PROMPT, toJsonTwice(input), 0.2, 20000);
+        return callOpenRouterJson("Skills Taxonomy", SKILLS_PROMPT, toJsonTwice(input), 0.2, 20000, false);
     }
 
     private JsonNode requestMatching(JsonNode input) {
-        return callOpenRouterJson("Matching Engine", MATCHING_PROMPT, toJsonTwice(input), 0.2, 100000);
+        return callOpenRouterJson("Matching Engine", MATCHING_PROMPT, toJsonTwice(input), 0.2, 100000, false);
     }
 
     private JsonNode requestTechnicalQuestions(JsonNode input) {
-        return callOpenRouterJson("Technical Questions Generation", TECHNICAL_PROMPT, toJsonTwice(input), 0.7, 100000);
+        return callOpenRouterJson("Technical Questions Generation", TECHNICAL_PROMPT, toJsonTwice(input), 0.7, 100000,
+                true);
     }
 
     private JsonNode requestHrQuestions(JsonNode input) {
-        return callOpenRouterJson("HR Questions Generation", HR_PROMPT, toJsonTwice(input), 0.7, 100000);
+        return callOpenRouterJson("HR Questions Generation", HR_PROMPT, toJsonTwice(input), 0.7, 100000, true);
     }
 
-    private JsonNode callOpenRouterJson(String stageName, String systemPrompt, String userContent, double temperature, int maxTokens) {
+    private JsonNode callOpenRouterJson(String stageName, String systemPrompt, String userContent, double temperature,
+            int maxTokens, boolean enforceJsonMode) {
         AppProperties.Openrouter openrouter = appProperties.getOpenrouter();
         log.debug("[{}][stage={}] OpenRouter call preparation started", Thread.currentThread().getName(), stageName);
         if (openrouter == null
@@ -480,15 +535,15 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
             throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "OpenRouter configuration is incomplete");
         }
 
+        Map<String, String> responseFormat = enforceJsonMode ? Map.of("type", "json_object") : null;
         OpenRouterRequest request = new OpenRouterRequest(
                 openrouter.getModel(),
                 List.of(
                         new OpenRouterRequestMessage("system", systemPrompt),
-                        new OpenRouterRequestMessage("user", userContent)
-                ),
+                        new OpenRouterRequestMessage("user", userContent)),
                 temperature,
-                maxTokens
-        );
+                maxTokens,
+                responseFormat);
 
         String content = callOpenRouterJsonContent(stageName, openrouter, request);
         JsonNode parsed = parseJsonFromLlmContent(content);
@@ -496,7 +551,8 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
         return parsed;
     }
 
-    private String callOpenRouterJsonContent(String stageName, AppProperties.Openrouter openrouter, OpenRouterRequest request) {
+    private String callOpenRouterJsonContent(String stageName, AppProperties.Openrouter openrouter,
+            OpenRouterRequest request) {
         long requestStart = System.currentTimeMillis();
         log.debug("[{}][stage={}] OpenRouter HTTP request started (model={}, maxTokens={})",
                 Thread.currentThread().getName(),
@@ -514,8 +570,8 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                             .defaultIfEmpty("")
                             .map(body -> new AppException(
                                     HttpStatus.BAD_GATEWAY,
-                                    "OpenRouter request failed with status " + r.statusCode().value() + compactErrorBody(body)
-                            )))
+                                    "OpenRouter request failed with status " + r.statusCode().value()
+                                            + compactErrorBody(body))))
                     .bodyToMono(OpenRouterResponse.class)
                     .timeout(Duration.ofSeconds(60))
                     .retryWhen(Retry.backoff(2, Duration.ofSeconds(2)).maxBackoff(Duration.ofSeconds(5)))
@@ -528,7 +584,8 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
             if (response == null || response.choices() == null || response.choices().isEmpty()) {
                 return "{}";
             }
-            String content = response.choices().get(0).message() == null ? null : response.choices().get(0).message().content();
+            String content = response.choices().get(0).message() == null ? null
+                    : response.choices().get(0).message().content();
             return isBlank(content) ? "{}" : content;
         } catch (Exception e) {
             log.error("OpenRouter API permanently failed after retries. Returning empty JSON fallback.", e);
@@ -649,7 +706,8 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
             if (source != null && source.isObject() && source.has("normalized_skills")) {
                 source = source.get("normalized_skills");
             }
-            if ((source == null || source.isNull()) && fallbackSkillsNode != null && !fallbackSkillsNode.isMissingNode()) {
+            if ((source == null || source.isNull()) && fallbackSkillsNode != null
+                    && !fallbackSkillsNode.isMissingNode()) {
                 source = fallbackSkillsNode;
             }
             if (source != null && source.isTextual()) {
@@ -779,8 +837,8 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
             String model,
             List<OpenRouterRequestMessage> messages,
             double temperature,
-            @JsonProperty("max_tokens") int maxTokens
-    ) {
+            @JsonProperty("max_tokens") int maxTokens,
+            @JsonProperty("response_format") Map<String, String> responseFormat) {
     }
 
     private record OpenRouterRequestMessage(String role, String content) {
@@ -795,4 +853,3 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
     private record OpenRouterResponseMessage(String content) {
     }
 }
-

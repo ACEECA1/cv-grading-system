@@ -238,7 +238,7 @@ public class CallbackService {
             return;
         }
         MatchScore matchScore = evaluation.getMatchScore() == null ? new MatchScore() : evaluation.getMatchScore();
-        matchScore.setOverallScore(payload.overallScore());
+        matchScore.setOverallScore(clampScore(payload.overallScore()));
         matchScore.setRecommendation(payload.recommendation());
         matchScore.setReasoning(payload.reasoning());
         mapMatchedSkills(matchScore, payload.matchedSkills());
@@ -402,6 +402,16 @@ public class CallbackService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private Double clampScore(Double score) {
+        if (score == null) {
+            return 0.0;
+        }
+        if (score > 10.0) {
+            score = Math.min(score / 10.0, 10.0);
+        }
+        return Math.max(0.0, Math.min(score, 10.0));
     }
 }
 

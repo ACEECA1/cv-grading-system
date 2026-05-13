@@ -8,7 +8,7 @@ import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record MatchScoreDTO(
-        @JsonAlias("overall_score")
+        @JsonAlias({"overall_score", "overall_match_score"})
         Double overallScore,
         @JsonAlias("matched_skills")
         List<String> matchedSkills,

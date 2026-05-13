@@ -542,7 +542,7 @@ class BackendFlowIntegrationTests {
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("SCORED"))
-                .andExpect(jsonPath("$.data.overallScore").value(86.7));
+                .andExpect(jsonPath("$.data.overallScore").value(8.67));
 
         Long matchScoreId = jdbcTemplate.queryForObject(
                 "select match_score_id from candidate_evaluations where id = ?",

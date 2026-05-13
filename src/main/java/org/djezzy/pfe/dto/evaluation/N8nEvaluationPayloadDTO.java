@@ -14,10 +14,10 @@ public record N8nEvaluationPayloadDTO(
         @JsonAlias("profileData")
         @JsonProperty("profile_data") ProfileDataDTO profileData,
         @JsonProperty("match_score") MatchScoreDTO matchScore,
-        @JsonAlias("technical_questions")
-        @JsonProperty("technical_assessment") List<TechnicalAssessmentDTO> technicalQuestions,
-        @JsonAlias("hr_questions")
-        @JsonProperty("hr_assessment") List<HrAssessmentDTO> hrQuestions
+        @JsonAlias("technical_assessment")
+        @JsonProperty("technical_questions") List<TechnicalQuestionDTO> technicalQuestions,
+        @JsonAlias("hr_assessment")
+        @JsonProperty("hr_questions") List<HrQuestionDTO> hrQuestions
 ) {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ProfileDataDTO(
@@ -102,6 +102,7 @@ public record N8nEvaluationPayloadDTO(
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record MatchScoreDTO(
+            @JsonAlias("overall_match_score")
             @JsonProperty("overall_score") Double overallScore,
             @JsonProperty("matched_skills") List<String> matchedSkills,
             @JsonProperty("missing_skills") List<MissingSkillDTO> missingSkills,
@@ -136,7 +137,7 @@ public record N8nEvaluationPayloadDTO(
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record TechnicalAssessmentDTO(
+    public record TechnicalQuestionDTO(
             @JsonProperty("question") String question,
             @JsonProperty("expected_answer") @JsonAlias("expectedAnswer") String expectedAnswer,
             @JsonProperty("difficulty") String difficulty,
@@ -147,7 +148,7 @@ public record N8nEvaluationPayloadDTO(
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record HrAssessmentDTO(
+    public record HrQuestionDTO(
             @JsonProperty("question") String question,
             @JsonProperty("psychological_intent") @JsonAlias("purpose") String psychologicalIntent,
             @JsonProperty("evaluation_criteria") String evaluationCriteria,
