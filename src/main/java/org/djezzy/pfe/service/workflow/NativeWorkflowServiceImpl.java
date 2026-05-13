@@ -19,6 +19,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.util.retry.Retry;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -489,41 +490,50 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                 maxTokens
         );
 
+        String content = callOpenRouterJsonContent(stageName, openrouter, request);
+        JsonNode parsed = parseJsonFromLlmContent(content);
+        log.debug("[{}][stage={}] OpenRouter response parsing completed", Thread.currentThread().getName(), stageName);
+        return parsed;
+    }
+
+    private String callOpenRouterJsonContent(String stageName, AppProperties.Openrouter openrouter, OpenRouterRequest request) {
         long requestStart = System.currentTimeMillis();
         log.debug("[{}][stage={}] OpenRouter HTTP request started (model={}, maxTokens={})",
                 Thread.currentThread().getName(),
                 stageName,
                 openrouter.getModel(),
-                maxTokens);
-        OpenRouterResponse response = webClient.post()
-                .uri(openrouter.getUrl())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + openrouter.getApiKey())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .retrieve()
-                .onStatus(HttpStatusCode::isError, r -> r.bodyToMono(String.class)
-                        .defaultIfEmpty("")
-                        .map(body -> new AppException(
-                                HttpStatus.BAD_GATEWAY,
-                                "OpenRouter request failed with status " + r.statusCode().value() + compactErrorBody(body)
-                        )))
-                .bodyToMono(OpenRouterResponse.class)
-                .block(Duration.ofSeconds(120));
-        log.debug("[{}][stage={}] OpenRouter HTTP request completed in {} ms",
-                Thread.currentThread().getName(),
-                stageName,
-                System.currentTimeMillis() - requestStart);
+                request.maxTokens());
+        try {
+            OpenRouterResponse response = webClient.post()
+                    .uri(openrouter.getUrl())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + openrouter.getApiKey())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(request)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, r -> r.bodyToMono(String.class)
+                            .defaultIfEmpty("")
+                            .map(body -> new AppException(
+                                    HttpStatus.BAD_GATEWAY,
+                                    "OpenRouter request failed with status " + r.statusCode().value() + compactErrorBody(body)
+                            )))
+                    .bodyToMono(OpenRouterResponse.class)
+                    .timeout(Duration.ofSeconds(60))
+                    .retryWhen(Retry.backoff(2, Duration.ofSeconds(2)).maxBackoff(Duration.ofSeconds(5)))
+                    .block();
+            log.debug("[{}][stage={}] OpenRouter HTTP request completed in {} ms",
+                    Thread.currentThread().getName(),
+                    stageName,
+                    System.currentTimeMillis() - requestStart);
 
-        if (response == null || response.choices() == null || response.choices().isEmpty()) {
-            throw new AppException(HttpStatus.BAD_GATEWAY, "OpenRouter returned no choices");
+            if (response == null || response.choices() == null || response.choices().isEmpty()) {
+                return "{}";
+            }
+            String content = response.choices().get(0).message() == null ? null : response.choices().get(0).message().content();
+            return isBlank(content) ? "{}" : content;
+        } catch (Exception e) {
+            log.error("OpenRouter API permanently failed after retries. Returning empty JSON fallback.", e);
+            return "{}";
         }
-        String content = response.choices().get(0).message() == null ? null : response.choices().get(0).message().content();
-        if (isBlank(content)) {
-            throw new AppException(HttpStatus.BAD_GATEWAY, "OpenRouter returned empty message content");
-        }
-        JsonNode parsed = parseJsonFromLlmContent(content);
-        log.debug("[{}][stage={}] OpenRouter response parsing completed", Thread.currentThread().getName(), stageName);
-        return parsed;
     }
 
     private JsonNode parseJsonFromLlmContent(String content) {

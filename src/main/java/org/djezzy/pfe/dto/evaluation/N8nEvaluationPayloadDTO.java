@@ -14,8 +14,10 @@ public record N8nEvaluationPayloadDTO(
         @JsonAlias("profileData")
         @JsonProperty("profile_data") ProfileDataDTO profileData,
         @JsonProperty("match_score") MatchScoreDTO matchScore,
-        @JsonProperty("technical_questions") List<TechnicalQuestionDTO> technicalQuestions,
-        @JsonProperty("hr_questions") List<HrQuestionDTO> hrQuestions
+        @JsonAlias("technical_questions")
+        @JsonProperty("technical_assessment") List<TechnicalAssessmentDTO> technicalQuestions,
+        @JsonAlias("hr_questions")
+        @JsonProperty("hr_assessment") List<HrAssessmentDTO> hrQuestions
 ) {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ProfileDataDTO(
@@ -134,24 +136,24 @@ public record N8nEvaluationPayloadDTO(
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record TechnicalQuestionDTO(
-            String question,
+    public record TechnicalAssessmentDTO(
+            @JsonProperty("question") String question,
             @JsonProperty("expected_answer") @JsonAlias("expectedAnswer") String expectedAnswer,
-            String difficulty,
+            @JsonProperty("difficulty") String difficulty,
             @JsonProperty("skill_area") String skillArea,
-            @JsonProperty("bluff_indicator") Boolean bluffIndicator,
+            @JsonProperty("bluff_indicator") boolean bluffIndicator,
             @JsonProperty("follow_up_questions") List<String> followUpQuestions
     ) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record HrQuestionDTO(
-            String question,
+    public record HrAssessmentDTO(
+            @JsonProperty("question") String question,
             @JsonProperty("psychological_intent") @JsonAlias("purpose") String psychologicalIntent,
+            @JsonProperty("evaluation_criteria") String evaluationCriteria,
             @JsonProperty("ideal_response_indicators") List<String> idealResponseIndicators,
             @JsonProperty("red_flags") List<String> redFlags,
-            @JsonProperty("follow_up_probes") List<String> followUpProbes,
-            @JsonProperty("evaluation_criteria") String evaluationCriteria
+            @JsonProperty("follow_up_probes") List<String> followUpProbes
     ) {
     }
 }
