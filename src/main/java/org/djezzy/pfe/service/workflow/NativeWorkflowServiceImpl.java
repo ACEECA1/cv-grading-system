@@ -45,6 +45,10 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
             .compile("(?:\\+?\\d{1,3}[-.\\s]?)?(?:\\(?\\d{1,4}\\)?[-.\\s]?)?\\d{1,4}[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,9}");
     private static final Pattern LINKEDIN_PATTERN = Pattern
             .compile("(?:https?://)?(?:www\\.)?linkedin\\.com/in/[A-Za-z0-9_-]+/?", Pattern.CASE_INSENSITIVE);
+    private static final String[] TEXT_HINT_KEYS = {
+            "value", "text", "label", "name", "full_name", "fullName", "location", "city", "state", "country",
+            "address", "full_address", "display", "description"
+    };
 
     private static final String CV_PARSER_PROMPT = """
             # Role & Persona
@@ -291,7 +295,7 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
         ObjectNode response = objectMapper.createObjectNode();
         response.put("status", "success");
         response.put("processing_time", String.format("%.2fs", (System.currentTimeMillis() - startedAt) / 1000.0));
-        response.set("profile_data", profileWithExtras);
+        response.set("profile_data", normalizeProfileData(profileWithExtras));
 
         JsonNode validationReport = consistencyResult != null && consistencyResult.has("validation_report")
                 ? consistencyResult.get("validation_report")
@@ -306,6 +310,45 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
         response.set("technical_questions", extractArray(technicalResult, "technical_questions"));
         response.set("hr_questions", extractArray(hrResult, "hr_questions"));
         return response;
+    }
+
+    private ObjectNode normalizeProfileData(ObjectNode source) {
+        ObjectNode normalized = source == null ? objectMapper.createObjectNode() : source.deepCopy();
+
+        JsonNode personalInfoNode = normalized.path("personal_info");
+        if (personalInfoNode.isObject()) {
+            ObjectNode personalInfo = (ObjectNode) personalInfoNode;
+            coerceTextField(personalInfo, "first_name");
+            coerceTextField(personalInfo, "last_name");
+            coerceTextField(personalInfo, "email");
+            coerceTextField(personalInfo, "phone");
+            coerceTextField(personalInfo, "location");
+        }
+
+        JsonNode contactInfoNode = normalized.path("contact_info");
+        if (contactInfoNode.isObject()) {
+            ObjectNode contactInfo = (ObjectNode) contactInfoNode;
+            coerceTextField(contactInfo, "email");
+            coerceTextField(contactInfo, "phone");
+            coerceTextField(contactInfo, "linkedin");
+        }
+
+        JsonNode normalizedSkillsNode = normalized.path("normalized_skills");
+        if (normalizedSkillsNode.isArray()) {
+            for (JsonNode skillNode : normalizedSkillsNode) {
+                if (!skillNode.isObject()) {
+                    continue;
+                }
+                ObjectNode skill = (ObjectNode) skillNode;
+                coerceTextField(skill, "original_name");
+                coerceTextField(skill, "normalized_name");
+                coerceTextField(skill, "category");
+                coerceTextField(skill, "proficiency_level");
+                coerceDoubleField(skill, "years_experience");
+            }
+        }
+
+        return normalized;
     }
 
     private JsonNode normalizeMatchScore(JsonNode rawMatchScore) {
@@ -474,6 +517,73 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
             return;
         }
         node.put(field, value);
+    }
+
+    private void coerceTextField(ObjectNode node, String field) {
+        JsonNode raw = node.get(field);
+        String text = coerceText(raw);
+        if (isBlank(text) || isPlaceholderText(text)) {
+            node.putNull(field);
+            return;
+        }
+        node.put(field, text);
+    }
+
+    private void coerceDoubleField(ObjectNode node, String field) {
+        Double value = parseDouble(node.get(field));
+        if (value == null) {
+            node.putNull(field);
+            return;
+        }
+        node.put(field, value);
+    }
+
+    private String coerceText(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        if (node.isTextual()) {
+            return node.asText();
+        }
+        if (node.isNumber() || node.isBoolean()) {
+            return node.asText();
+        }
+        if (node.isArray()) {
+            ArrayNode array = (ArrayNode) node;
+            ArrayList<String> parts = new ArrayList<>();
+            for (JsonNode item : array) {
+                String value = coerceText(item);
+                if (!isBlank(value)) {
+                    parts.add(value);
+                }
+            }
+            return parts.isEmpty() ? null : String.join(", ", parts);
+        }
+        if (node.isObject()) {
+            for (String key : TEXT_HINT_KEYS) {
+                if (node.has(key)) {
+                    String value = coerceText(node.get(key));
+                    if (!isBlank(value)) {
+                        return value;
+                    }
+                }
+            }
+            return null;
+        }
+        return null;
+    }
+
+    private boolean isPlaceholderText(String value) {
+        if (isBlank(value)) {
+            return true;
+        }
+        String normalized = value.trim().toLowerCase();
+        return normalized.equals("n/a")
+                || normalized.equals("na")
+                || normalized.equals("none")
+                || normalized.equals("null")
+                || normalized.equals("not available")
+                || normalized.equals("unknown");
     }
 
     private String firstNonBlank(String... candidates) {
