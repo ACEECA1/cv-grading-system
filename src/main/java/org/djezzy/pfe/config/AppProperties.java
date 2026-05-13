@@ -19,6 +19,8 @@ public class AppProperties {
     private List<String> frontendUrls;
     private Callback callback = new Callback();
     private N8n n8n = new N8n();
+    private Automation automation = new Automation();
+    private Logging logging = new Logging();
     private Openrouter openrouter = new Openrouter();
     private Admin admin = new Admin();
 
@@ -38,8 +40,20 @@ public class AppProperties {
 
     @Getter
     @Setter
+    public static class Automation {
+        private boolean useN8n = true;
+    }
+
+    @Getter
+    @Setter
     public static class Callback {
         private String apiKey;
+    }
+
+    @Getter
+    @Setter
+    public static class Logging {
+        private boolean showWorkflow = false;
     }
 
     @Getter

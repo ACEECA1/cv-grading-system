@@ -13,6 +13,7 @@ import org.djezzy.pfe.model.evaluation.CandidateEvaluation;
 import org.djezzy.pfe.model.evaluation.EvaluationStatus;
 import org.djezzy.pfe.model.job.JobOffer;
 import org.djezzy.pfe.model.job.StructuredJd;
+import org.djezzy.pfe.service.workflow.WorkflowProcessorService;
 import org.djezzy.pfe.util.AppException;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
@@ -35,6 +36,7 @@ public class AsyncWorkflowService {
     private final AppProperties appProperties;
     private final OcrService ocrService;
     private final ObjectMapper objectMapper;
+    private final WorkflowProcessorService workflowProcessorService;
 
     @Async("applicationTaskExecutor")
     @Transactional
@@ -93,18 +95,12 @@ public class AsyncWorkflowService {
                     "cv_text", ocrResult.rawText(),
                     "job_description", jobDescriptionJson
             );
+            log.debug("Dispatching evaluation workflow for {} (useN8n={})", evaluation.getId(), appProperties.getAutomation().isUseN8n());
             if (isSubmissionWithdrawn(cvId, evaluationId)) {
                 log.info("Submission CV {} / evaluation {} was withdrawn before webhook dispatch", cvId, evaluationId);
                 return;
             }
-            webClient.post()
-                    .uri(appProperties.getN8n().getEvaluationUrl())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(payload)
-                    .retrieve()
-                    .toBodilessEntity()
-                    .doOnError(error -> log.error("Failed to dispatch evaluation webhook for CV {}", cvId, error))
-                    .subscribe();
+            workflowProcessorService.processWorkflow(payload);
             if (isSubmissionWithdrawn(cvId, evaluationId)) {
                 log.info("Submission CV {} / evaluation {} was withdrawn before status update", cvId, evaluationId);
                 return;

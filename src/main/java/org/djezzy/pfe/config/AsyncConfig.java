@@ -20,5 +20,16 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    @Bean(name = "workflowProcessorExecutor")
+    public Executor workflowProcessorExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(8);
+        executor.setMaxPoolSize(32);
+        executor.setQueueCapacity(500);
+        executor.setThreadNamePrefix("pfe-workflow-");
+        executor.initialize();
+        return executor;
+    }
 }
 
