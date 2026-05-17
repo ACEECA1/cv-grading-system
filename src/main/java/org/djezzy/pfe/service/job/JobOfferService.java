@@ -46,6 +46,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -255,9 +256,10 @@ public class JobOfferService {
     }
 
     @Transactional(readOnly = true)
-    public List<ApplicantSummaryDTO> getJobApplicants(Long jobOfferId) {
+    public List<ApplicantSummaryDTO> getJobApplicants(Long jobOfferId, String sortBy, String direction) {
         findJobOffer(jobOfferId);
-        return cvdao.findByJobOfferIdOrderByUploadDateDesc(jobOfferId).stream()
+        Sort sort = buildApplicantsSort(sortBy, direction);
+        return cvdao.findByJobOfferId(jobOfferId, sort).stream()
                 .map(this::toApplicantSummaryDto)
                 .toList();
     }
@@ -460,6 +462,41 @@ public class JobOfferService {
         );
     }
 
+    private Sort buildApplicantsSort(String sortBy, String direction) {
+        String normalizedSortBy = sortBy == null ? "score" : sortBy.trim().toLowerCase(Locale.ROOT);
+        Sort.Direction sortDirection = parseSortDirection(direction);
+
+        if (normalizedSortBy.equals("date")) {
+            return Sort.by(
+                    new Sort.Order(sortDirection, "uploadDate").nullsLast(),
+                    new Sort.Order(Sort.Direction.DESC, "id"));
+        }
+
+        if (normalizedSortBy.equals("name")) {
+            return Sort.by(
+                    new Sort.Order(sortDirection, "candidate.lastName").ignoreCase().nullsLast(),
+                    new Sort.Order(sortDirection, "candidate.firstName").ignoreCase().nullsLast(),
+                    new Sort.Order(Sort.Direction.DESC, "uploadDate"));
+        }
+
+        if (normalizedSortBy.equals("status")) {
+            return Sort.by(
+                    new Sort.Order(sortDirection, "candidateEvaluation.status").nullsLast(),
+                    new Sort.Order(Sort.Direction.DESC, "uploadDate"));
+        }
+
+        return Sort.by(
+                new Sort.Order(sortDirection, "candidateEvaluation.matchScore.overallScore").nullsLast(),
+                new Sort.Order(Sort.Direction.DESC, "uploadDate"));
+    }
+
+    private Sort.Direction parseSortDirection(String direction) {
+        if (direction != null && direction.trim().equalsIgnoreCase("asc")) {
+            return Sort.Direction.ASC;
+        }
+        return Sort.Direction.DESC;
+    }
+
     private List<String> normalizeTextList(List<String> values) {
         if (values == null) {
             return List.of();
@@ -539,5 +576,4 @@ public class JobOfferService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 }
-
 

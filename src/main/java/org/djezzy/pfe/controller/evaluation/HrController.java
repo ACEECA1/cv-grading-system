@@ -39,10 +39,12 @@ public class HrController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) Long jobId,
-            @RequestParam(required = false) Double minScore
+            @RequestParam(required = false) Double minScore,
+            @RequestParam(defaultValue = "score") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction
     ) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        return ResponseEntity.ok(ApiResponse.ok("Evaluations", hrService.listEvaluations(pageable, jobId, minScore)));
+        Pageable pageable = PageRequest.of(page, size, Sort.unsorted());
+        return ResponseEntity.ok(ApiResponse.ok("Evaluations", hrService.listEvaluations(pageable, jobId, minScore, sortBy, direction)));
     }
 
     @GetMapping("/evaluations/{evaluationId}")
@@ -61,5 +63,4 @@ public class HrController {
                 .body(resource);
     }
 }
-
 

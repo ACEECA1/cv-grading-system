@@ -18,7 +18,9 @@ import org.djezzy.pfe.model.auth.Role;
 import org.djezzy.pfe.util.AppException;
 import org.djezzy.pfe.util.FileStorageUtil;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -48,7 +51,12 @@ public class HrService {
     }
 
     @Transactional(readOnly = true)
-    public Page<HrEvaluationSummaryDTO> listEvaluations(Pageable pageable, Long jobId, Double minScore) {
+    public Page<HrEvaluationSummaryDTO> listEvaluations(
+            Pageable pageable,
+            Long jobId,
+            Double minScore,
+            String sortBy,
+            String sortDirection) {
         Specification<CandidateEvaluation> specification = Specification.where(null);
         if (jobId != null) {
             specification = specification.and((root, query, cb) ->
@@ -60,7 +68,11 @@ public class HrService {
                     cb.greaterThanOrEqualTo(root.join("matchScore", jakarta.persistence.criteria.JoinType.LEFT).get("overallScore"), minScore)
             );
         }
-        return candidateEvaluationDAO.findAll(specification, pageable)
+        Pageable sortedPageable = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                buildEvaluationSort(sortBy, sortDirection));
+        return candidateEvaluationDAO.findAll(specification, sortedPageable)
                 .map(this::toSummaryDto);
     }
 
@@ -290,5 +302,28 @@ public class HrService {
         }
         return (int) rounded;
     }
-}
 
+    private Sort buildEvaluationSort(String sortBy, String sortDirection) {
+        String normalizedSortBy = sortBy == null ? "score" : sortBy.trim().toLowerCase(Locale.ROOT);
+        Sort.Direction direction = parseDirection(sortDirection);
+
+        if (normalizedSortBy.equals("date") || normalizedSortBy.equals("upload_date") || normalizedSortBy.equals("uploaddate")) {
+            return Sort.by(
+                    new Sort.Order(direction, "cv.uploadDate").nullsLast(),
+                    new Sort.Order(Sort.Direction.DESC, "matchScore.overallScore").nullsLast(),
+                    new Sort.Order(Sort.Direction.DESC, "id"));
+        }
+
+        return Sort.by(
+                new Sort.Order(direction, "matchScore.overallScore").nullsLast(),
+                new Sort.Order(Sort.Direction.DESC, "cv.uploadDate").nullsLast(),
+                new Sort.Order(Sort.Direction.DESC, "id"));
+    }
+
+    private Sort.Direction parseDirection(String sortDirection) {
+        if (sortDirection != null && sortDirection.trim().equalsIgnoreCase("asc")) {
+            return Sort.Direction.ASC;
+        }
+        return Sort.Direction.DESC;
+    }
+}

@@ -64,8 +64,12 @@ public class JobOfferController {
     }
 
     @GetMapping({"/api/hr/job-offers/{jobOfferId}/applicants", "/api/rh/job-offers/{jobOfferId}/applicants"})
-    public ResponseEntity<ApiResponse<List<ApplicantSummaryDTO>>> getApplicants(@PathVariable Long jobOfferId) {
-        return ResponseEntity.ok(ApiResponse.ok("Job offer applicants", jobOfferService.getJobApplicants(jobOfferId)));
+    public ResponseEntity<ApiResponse<List<ApplicantSummaryDTO>>> getApplicants(
+            @PathVariable Long jobOfferId,
+            @RequestParam(defaultValue = "score") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok("Job offer applicants", jobOfferService.getJobApplicants(jobOfferId, sortBy, direction)));
     }
 
     @PostMapping({"/api/hr/job-offers", "/api/rh/job-offers"})
@@ -109,5 +113,4 @@ public class JobOfferController {
         return ResponseEntity.ok(ApiResponse.ok("Job offer deleted", null));
     }
 }
-
 
