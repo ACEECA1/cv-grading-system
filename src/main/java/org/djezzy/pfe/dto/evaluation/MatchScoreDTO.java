@@ -25,7 +25,7 @@ public record MatchScoreDTO(
     public record ExperienceAlignmentPayload(
             @JsonAlias("years_required") String yearsRequired,
             @JsonAlias("years_candidate") String yearsCandidate,
-            @JsonAlias("match_percentage") String matchPercentage
+            @JsonAlias({"match_percentage", "match_score"}) String matchPercentage
     ) {
     }
 
@@ -37,7 +37,6 @@ public record MatchScoreDTO(
     ) {
     }
 }
-
 
 
 

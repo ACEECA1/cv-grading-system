@@ -54,6 +54,17 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
             # Role & Persona
             You are an expert CV Parser. Convert unstructured CV text into structured JSON.
             Return JSON only.
+            You must extract the candidate's work and project experience.
+            Return ONLY valid JSON.
+            Your response must strictly match this exact schema for the experience array:
+            "experience": [
+              {
+                "title": "<The job or role title>",
+                "company": "<The company, organization, or university club>",
+                "duration": "<The exact dates, e.g., 'Jan 2023 - Present' or '2022'>",
+                "description": "<A brief summary of their responsibilities and achievements>"
+              }
+            ]
             """;
 
     private static final String CONSISTENCY_PROMPT = """
@@ -68,9 +79,22 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
 
     private static final String MATCHING_PROMPT = """
             You are a Senior Talent Matching Analyst.
-            Return only valid JSON with root key "match_score" containing:
+            Return only valid JSON with root key "match_score" containing this strict schema:
             "overall_match_score": <number strictly between 0.0 and 10.0, e.g., 8.5>,
-            matched_skills, missing_skills, experience_alignment, education_match, recommendation, reasoning.
+            "matched_skills": [<string>],
+            "missing_skills": [{"skill_name": "<string>", "importance": "<Low|Medium|High>"}],
+            "experience_alignment": {
+              "years_required": <integer: exact years required from JD, use 0 if none specified>,
+              "years_candidate": <integer: exact years calculated from CV, use 0 if none>,
+              "match_score": <number 0.0 to 10.0>
+            },
+            "education_match": {
+              "required_degree": "<string: exact degree required, e.g. 'Bachelor', or 'Not specified'>",
+              "candidate_degree": "<string: candidate's highest degree, e.g. 'Master', or 'None'>",
+              "match_status": "<string: reasoning>"
+            },
+            "recommendation": "<string>",
+            "reasoning": "<string>".
             The overall_match_score MUST be a decimal number from 0.0 to 10.0. Never exceed 10 or go below 0.
             """;
 
@@ -439,46 +463,83 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
 
     private ObjectNode normalizeExperienceAlignment(JsonNode source) {
         ObjectNode normalizedAlignment = objectMapper.createObjectNode();
-        if (source == null || source.isNull()) {
-            normalizedAlignment.putNull("years_required");
-            normalizedAlignment.putNull("years_candidate");
-            normalizedAlignment.putNull("match_percentage");
-            return normalizedAlignment;
+        Integer yearsRequired = 0;
+        Integer yearsCandidate = 0;
+        Double matchScore = 0.0;
+
+        if (source != null && !source.isNull()) {
+            if (source.isObject()) {
+                yearsRequired = firstNonNull(parseInteger(source.path("years_required")), 0);
+                yearsCandidate = firstNonNull(parseInteger(source.path("years_candidate")), 0);
+                JsonNode matchNode = source.has("match_score") ? source.path("match_score") : source.path("match_percentage");
+                Double parsedMatch = parseDouble(matchNode);
+                matchScore = parsedMatch == null ? 0.0 : normalizeSubScore(parsedMatch);
+            } else {
+                Double parsedMatch = parseDouble(source);
+                matchScore = parsedMatch == null ? 0.0 : normalizeSubScore(parsedMatch);
+            }
         }
 
-        if (source.isObject()) {
-            putNullableDouble(normalizedAlignment, "years_required", parseDouble(source.path("years_required")));
-            putNullableDouble(normalizedAlignment, "years_candidate", parseDouble(source.path("years_candidate")));
-            putNullableDouble(normalizedAlignment, "match_percentage", parseDouble(source.path("match_percentage")));
-            return normalizedAlignment;
-        }
-
-        Double extracted = parseDouble(source);
-        putNullableDouble(normalizedAlignment, "years_required", null);
-        putNullableDouble(normalizedAlignment, "years_candidate", null);
-        putNullableDouble(normalizedAlignment, "match_percentage", extracted);
+        normalizedAlignment.put("years_required", yearsRequired);
+        normalizedAlignment.put("years_candidate", yearsCandidate);
+        normalizedAlignment.put("match_score", matchScore);
+        normalizedAlignment.remove("match_percentage");
         return normalizedAlignment;
     }
 
     private ObjectNode normalizeEducationMatch(JsonNode source) {
         ObjectNode normalizedEducation = objectMapper.createObjectNode();
         if (source == null || source.isNull()) {
-            normalizedEducation.putNull("required_degree");
-            normalizedEducation.putNull("candidate_degree");
-            normalizedEducation.putNull("match_status");
+            normalizedEducation.put("required_degree", "Not specified");
+            normalizedEducation.put("candidate_degree", "Not specified");
+            normalizedEducation.put("match_status", "Not specified");
             return normalizedEducation;
         }
         if (source.isObject()) {
-            putNullableText(normalizedEducation, "required_degree", source.path("required_degree").asText(null));
-            putNullableText(normalizedEducation, "candidate_degree", source.path("candidate_degree").asText(null));
-            putNullableText(normalizedEducation, "match_status", source.path("match_status").asText(null));
+            normalizedEducation.put(
+                    "required_degree",
+                    firstNonBlank(source.path("required_degree").asText(null), "Not specified"));
+            normalizedEducation.put(
+                    "candidate_degree",
+                    firstNonBlank(source.path("candidate_degree").asText(null), "Not specified"));
+            normalizedEducation.put(
+                    "match_status",
+                    firstNonBlank(source.path("match_status").asText(null), "Not specified"));
             return normalizedEducation;
         }
 
-        putNullableText(normalizedEducation, "required_degree", null);
-        putNullableText(normalizedEducation, "candidate_degree", null);
-        putNullableText(normalizedEducation, "match_status", source.asText(null));
+        normalizedEducation.put("required_degree", "Not specified");
+        normalizedEducation.put("candidate_degree", "Not specified");
+        normalizedEducation.put("match_status", firstNonBlank(source.asText(null), "Not specified"));
         return normalizedEducation;
+    }
+
+    private Integer parseInteger(JsonNode node) {
+        Double parsed = parseDouble(node);
+        if (parsed == null) {
+            return null;
+        }
+        long rounded = Math.round(parsed);
+        if (rounded < 0) {
+            return 0;
+        }
+        if (rounded > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        return (int) rounded;
+    }
+
+    private double normalizeSubScore(double value) {
+        double normalized = value;
+        if (normalized > 10.0) {
+            normalized = normalized / 10.0;
+        }
+        normalized = Math.max(0.0, Math.min(normalized, 10.0));
+        return Math.round(normalized * 100.0) / 100.0;
+    }
+
+    private <T> T firstNonNull(T value, T fallback) {
+        return value == null ? fallback : value;
     }
 
     private Double parseDouble(JsonNode node) {
@@ -610,7 +671,7 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
     }
 
     private JsonNode requestCvParser(String cvText) {
-        return callOpenRouterJson("CV Parsing", CV_PARSER_PROMPT, toJson(cvText), 0.2, 30000, false);
+        return callOpenRouterJson("CV Parsing", CV_PARSER_PROMPT, toJson(cvText), 0.2, 30000, true);
     }
 
     private JsonNode requestConsistencyCheck(JsonNode input) {

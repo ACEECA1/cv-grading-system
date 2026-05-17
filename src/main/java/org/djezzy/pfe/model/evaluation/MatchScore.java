@@ -67,7 +67,3 @@ public class MatchScore extends BaseEntity {
         skill.setMatchScore(this);
     }
 }
-
-
-
-

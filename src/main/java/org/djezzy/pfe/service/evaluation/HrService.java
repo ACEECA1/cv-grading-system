@@ -119,8 +119,8 @@ public class HrService {
         CandidateEvaluationDTO.ExperienceAlignmentDTO experienceAlignment = matchScore == null || matchScore.getExperienceAlignment() == null
                 ? null
                 : new CandidateEvaluationDTO.ExperienceAlignmentDTO(
-                matchScore.getExperienceAlignment().getYearsRequired(),
-                matchScore.getExperienceAlignment().getYearsCandidate(),
+                toIntegerYears(matchScore.getExperienceAlignment().getYearsRequired()),
+                toIntegerYears(matchScore.getExperienceAlignment().getYearsCandidate()),
                 matchScore.getExperienceAlignment().getMatchPercentage()
         );
         CandidateEvaluationDTO.EducationMatchDTO educationMatch = matchScore == null || matchScore.getEducationMatch() == null
@@ -276,6 +276,19 @@ public class HrService {
         }
         return trimToNull(second);
     }
-}
 
+    private Integer toIntegerYears(Double value) {
+        if (value == null) {
+            return null;
+        }
+        long rounded = Math.round(value);
+        if (rounded < Integer.MIN_VALUE) {
+            return Integer.MIN_VALUE;
+        }
+        if (rounded > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        return (int) rounded;
+    }
+}
 

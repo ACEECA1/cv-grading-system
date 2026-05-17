@@ -23,9 +23,9 @@ public record CandidateEvaluationDTO(
     }
 
     public record ExperienceAlignmentDTO(
-            Double yearsRequired,
-            Double yearsCandidate,
-            Double matchPercentage
+            Integer yearsRequired,
+            Integer yearsCandidate,
+            Double matchScore
     ) {
     }
 
@@ -36,7 +36,6 @@ public record CandidateEvaluationDTO(
     ) {
     }
 }
-
 
 
 

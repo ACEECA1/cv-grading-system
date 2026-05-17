@@ -49,11 +49,10 @@ public record N8nEvaluationPayloadDTO(
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ExperienceDTO(
-            String title,
-            String company,
-            @JsonProperty("start_date") String startDate,
-            @JsonProperty("end_date") String endDate,
-            String description
+            @JsonProperty("title") String title,
+            @JsonProperty("company") String company,
+            @JsonProperty("duration") @JsonAlias({"start_date", "end_date"}) String duration,
+            @JsonProperty("description") String description
     ) {
     }
 
@@ -122,9 +121,10 @@ public record N8nEvaluationPayloadDTO(
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ExperienceAlignmentDTO(
-            @JsonProperty("years_required") Double yearsRequired,
-            @JsonProperty("years_candidate") Double yearsCandidate,
-            @JsonProperty("match_percentage") Double matchPercentage
+            @JsonProperty("years_required") Integer yearsRequired,
+            @JsonProperty("years_candidate") Integer yearsCandidate,
+            @JsonProperty("match_score")
+            Double matchScore
     ) {
     }
 
@@ -158,7 +158,3 @@ public record N8nEvaluationPayloadDTO(
     ) {
     }
 }
-
-
-
-

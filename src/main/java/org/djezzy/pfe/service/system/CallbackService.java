@@ -118,8 +118,18 @@ public class CallbackService {
             Experience experience = new Experience();
             experience.setTitle(payload.title());
             experience.setCompany(payload.company());
-            experience.setStartDate(payload.startDate());
-            experience.setEndDate(payload.endDate());
+            String duration = payload.duration();
+            if (hasText(duration)) {
+                String normalizedDuration = duration.trim();
+                String[] parts = normalizedDuration.split("\\s+-\\s+", 2);
+                if (parts.length == 2) {
+                    experience.setStartDate(parts[0].trim());
+                    experience.setEndDate(parts[1].trim());
+                } else {
+                    experience.setStartDate(normalizedDuration);
+                    experience.setEndDate(null);
+                }
+            }
             experience.setDescription(payload.description());
             profileData.addExperience(experience);
         }
@@ -281,9 +291,16 @@ public class CallbackService {
         ExperienceAlignment experienceAlignment = matchScore.getExperienceAlignment() == null
                 ? new ExperienceAlignment()
                 : matchScore.getExperienceAlignment();
-        experienceAlignment.setYearsRequired(payload.yearsRequired());
-        experienceAlignment.setYearsCandidate(payload.yearsCandidate());
-        experienceAlignment.setMatchPercentage(payload.matchPercentage());
+        experienceAlignment.setYearsRequired(payload.yearsRequired() == null ? 0.0 : payload.yearsRequired().doubleValue());
+        experienceAlignment.setYearsCandidate(payload.yearsCandidate() == null ? 0.0 : payload.yearsCandidate().doubleValue());
+        Double alignmentScore = payload.matchScore();
+        if (alignmentScore == null) {
+            alignmentScore = 0.0;
+        }
+        if (alignmentScore > 10.0) {
+            alignmentScore = Math.min(alignmentScore / 10.0, 10.0);
+        }
+        experienceAlignment.setMatchPercentage(Math.max(0.0, alignmentScore));
         matchScore.setExperienceAlignment(experienceAlignment);
     }
 
@@ -294,9 +311,9 @@ public class CallbackService {
         EducationMatch educationMatch = matchScore.getEducationMatch() == null
                 ? new EducationMatch()
                 : matchScore.getEducationMatch();
-        educationMatch.setRequiredDegree(payload.requiredDegree());
-        educationMatch.setCandidateDegree(payload.candidateDegree());
-        educationMatch.setMatchStatus(payload.matchStatus());
+        educationMatch.setRequiredDegree(hasText(payload.requiredDegree()) ? payload.requiredDegree().trim() : "Not specified");
+        educationMatch.setCandidateDegree(hasText(payload.candidateDegree()) ? payload.candidateDegree().trim() : "Not specified");
+        educationMatch.setMatchStatus(hasText(payload.matchStatus()) ? payload.matchStatus().trim() : "Not specified");
         matchScore.setEducationMatch(educationMatch);
     }
 
@@ -414,5 +431,3 @@ public class CallbackService {
         return Math.max(0.0, Math.min(score, 10.0));
     }
 }
-
-
