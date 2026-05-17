@@ -106,6 +106,7 @@ create table job_offers (
     created_by_id bigint not null,
     id bigint not null auto_increment,
     updated_at datetime(6) not null,
+    is_deleted boolean default false not null,
     status varchar(32) not null,
     jd_request_id varchar(255),
     title varchar(255) not null,

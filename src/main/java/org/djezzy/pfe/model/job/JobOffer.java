@@ -14,6 +14,8 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.type.SqlTypes;
 import org.djezzy.pfe.model.auth.User;
 import org.djezzy.pfe.model.evaluation.BaseEntity;
@@ -26,6 +28,8 @@ import java.util.List;
 @Setter
 @Entity
 @Table(name = "job_offers")
+@SQLDelete(sql = "UPDATE job_offers SET is_deleted = true WHERE id=?")
+@SQLRestriction("is_deleted = false")
 public class JobOffer extends BaseEntity {
     @Column(nullable = false)
     private String title;
@@ -42,6 +46,9 @@ public class JobOffer extends BaseEntity {
     @Column
     private String jdRequestId;
 
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by_id", nullable = false)
     private User createdBy;
@@ -52,7 +59,6 @@ public class JobOffer extends BaseEntity {
     @OneToMany(mappedBy = "jobOffer")
     private List<CV> cvs = new ArrayList<>();
 }
-
 
 
 

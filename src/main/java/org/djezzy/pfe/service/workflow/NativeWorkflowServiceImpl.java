@@ -683,7 +683,7 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                                     "OpenRouter request failed with status " + r.statusCode().value()
                                             + compactErrorBody(body))))
                     .bodyToMono(OpenRouterResponse.class)
-                    .timeout(Duration.ofSeconds(60))
+                    .timeout(Duration.ofSeconds(360))
                     .retryWhen(Retry.backoff(2, Duration.ofSeconds(2)).maxBackoff(Duration.ofSeconds(5)))
                     .block();
             log.debug("[{}][stage={}] OpenRouter HTTP request completed in {} ms",

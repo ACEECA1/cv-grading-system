@@ -472,7 +472,7 @@ public class JobOfferService {
 
     private void applyStructuredJdData(StructuredJd structuredJd, StructuredJdCallbackRequest request) {
         structuredJd.setTitle(request.title());
-        String companyName = hasText(request.companyName()) ? request.companyName().trim() : appProperties.getCompanyName();
+        String companyName = appProperties.getCompanyName();
         structuredJd.setCompanyName(hasText(companyName) ? companyName.trim() : null);
         structuredJd.setWorkLocation(request.workLocation());
         structuredJd.setEmploymentType(request.employmentType());
