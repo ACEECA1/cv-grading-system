@@ -49,12 +49,12 @@ public class JobOfferController {
             @RequestParam(required = false) Boolean isPublished,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir
+            @RequestParam(defaultValue = "newest") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction
     ) {
         return ResponseEntity.ok(ApiResponse.ok(
                 "Job offers",
-                jobOfferService.getJobOffers(title, location, isPublished, page, size, sortBy, sortDir)
+                jobOfferService.getJobOffers(title, location, isPublished, page, size, sortBy, direction)
         ));
     }
 
@@ -113,4 +113,3 @@ public class JobOfferController {
         return ResponseEntity.ok(ApiResponse.ok("Job offer deleted", null));
     }
 }
-

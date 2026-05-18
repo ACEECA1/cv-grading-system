@@ -31,6 +31,7 @@ import org.djezzy.pfe.util.AppException;
 import org.djezzy.pfe.util.MapperUtil;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -45,6 +46,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -201,17 +203,31 @@ public class JobOfferService {
             int page,
             int size,
             String sortBy,
-            String sortDir
+            String direction
     ) {
-        Sort.Direction direction;
-        try {
-            direction = Sort.Direction.fromString(sortDir);
-        } catch (IllegalArgumentException ex) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Invalid sort direction. Use 'asc' or 'desc'.");
+        Sort.Direction sortDirection = parseSortDirection(direction);
+        String normalizedSortBy = sortBy == null ? "newest" : sortBy.trim().toLowerCase(Locale.ROOT);
+
+        List<JobOffer> filteredOffers = jobOfferDAO.findAllByFilters(title, location, isPublished, Pageable.unpaged())
+                .getContent();
+        Comparator<JobOffer> comparator = buildJobOffersComparator(normalizedSortBy);
+        if (sortDirection == Sort.Direction.DESC) {
+            comparator = comparator.reversed();
         }
-        String sortProperty = (sortBy == null || sortBy.isBlank()) ? "createdAt" : sortBy;
-        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortProperty));
-        return jobOfferDAO.findAllByFilters(title, location, isPublished, pageable).map(mapperUtil::toJobOfferDto);
+
+        List<JobOffer> sortedOffers = filteredOffers.stream()
+                .sorted(comparator)
+                .toList();
+
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.max(size, 1);
+        int fromIndex = Math.min(safePage * safeSize, sortedOffers.size());
+        int toIndex = Math.min(fromIndex + safeSize, sortedOffers.size());
+        List<JobOfferDTO> content = sortedOffers.subList(fromIndex, toIndex).stream()
+                .map(mapperUtil::toJobOfferDto)
+                .toList();
+
+        return new PageImpl<>(content, PageRequest.of(safePage, safeSize), sortedOffers.size());
     }
 
     @Transactional(readOnly = true)
@@ -490,6 +506,38 @@ public class JobOfferService {
                 new Sort.Order(Sort.Direction.DESC, "uploadDate"));
     }
 
+    private Comparator<JobOffer> buildJobOffersComparator(String sortBy) {
+        if ("applicants".equals(sortBy)) {
+            return Comparator.comparingInt(this::countApplicants)
+                    .thenComparing(JobOffer::getId, Comparator.nullsLast(Comparator.naturalOrder()));
+        }
+        if ("highestscore".equals(sortBy)) {
+            return Comparator.comparingDouble(this::highestCandidateScore)
+                    .thenComparing(JobOffer::getId, Comparator.nullsLast(Comparator.naturalOrder()));
+        }
+        return Comparator.comparing(JobOffer::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(JobOffer::getId, Comparator.nullsLast(Comparator.naturalOrder()));
+    }
+
+    private int countApplicants(JobOffer offer) {
+        return offer != null && offer.getCvs() != null ? offer.getCvs().size() : 0;
+    }
+
+    private double highestCandidateScore(JobOffer offer) {
+        if (offer == null || offer.getCvs() == null) {
+            return 0.0;
+        }
+        return offer.getCvs().stream()
+                .map(CV::getCandidateEvaluation)
+                .filter(Objects::nonNull)
+                .map(CandidateEvaluation::getMatchScore)
+                .filter(Objects::nonNull)
+                .map(MatchScore::getOverallScore)
+                .filter(Objects::nonNull)
+                .max(Double::compareTo)
+                .orElse(0.0);
+    }
+
     private Sort.Direction parseSortDirection(String direction) {
         if (direction != null && direction.trim().equalsIgnoreCase("asc")) {
             return Sort.Direction.ASC;
@@ -576,4 +624,3 @@ public class JobOfferService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 }
-
