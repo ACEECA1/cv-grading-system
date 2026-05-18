@@ -3,13 +3,17 @@ package org.djezzy.pfe.dto.job;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
 public record StructuredJdCallbackRequest(
         @NotBlank @JsonAlias({"jobTitle", "job_title"}) String title,
         @JsonAlias({"companyName", "company_name"}) String companyName,
-        @JsonAlias({"requiredSkills", "required_skills"}) List<String> requiredSkills,
+        @NotNull
+        @NotEmpty
+        @JsonAlias({"requiredSkills", "required_skills"}) List<@NotBlank String> requiredSkills,
         @JsonAlias({"preferredSkills", "preferred_skills"}) List<String> preferredSkills,
         @JsonAlias({"experienceRange", "experience_range"}) ExperienceRangeDTO experienceRange,
         @JsonAlias("responsibilities") List<String> responsibilities,
@@ -18,7 +22,6 @@ public record StructuredJdCallbackRequest(
         @JsonAlias({"employmentType", "employment_type"}) String employmentType
 ) {
 }
-
 
 
 

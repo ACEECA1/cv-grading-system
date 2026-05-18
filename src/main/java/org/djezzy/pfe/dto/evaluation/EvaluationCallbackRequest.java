@@ -1,6 +1,6 @@
 package org.djezzy.pfe.dto.evaluation;
 
-import org.djezzy.pfe.dto.job.*;
+import org.djezzy.pfe.dto.job.StructuredJdDTO;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -21,7 +21,6 @@ public record EvaluationCallbackRequest(
         @JsonAlias("hr_questions") List<HrQuestionDTO> hrQuestions
 ) {
 }
-
 
 
 

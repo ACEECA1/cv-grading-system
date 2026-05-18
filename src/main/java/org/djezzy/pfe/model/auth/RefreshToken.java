@@ -1,6 +1,6 @@
 package org.djezzy.pfe.model.auth;
 
-import org.djezzy.pfe.model.evaluation.*;
+import org.djezzy.pfe.model.evaluation.BaseEntity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -31,7 +31,6 @@ public class RefreshToken extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 }
-
 
 
 

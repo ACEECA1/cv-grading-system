@@ -4,15 +4,18 @@ package org.djezzy.pfe.dto.evaluation;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record N8nEvaluationPayloadDTO(
-        String status,
+        @NotBlank String status,
         @JsonProperty("processing_time") String processingTime,
         @JsonAlias("profileData")
         @JsonProperty("profile_data") ProfileDataDTO profileData,
+        @NotNull
         @JsonProperty("match_score") MatchScoreDTO matchScore,
         @JsonAlias("technical_assessment")
         @JsonProperty("technical_questions") List<TechnicalQuestionDTO> technicalQuestions,

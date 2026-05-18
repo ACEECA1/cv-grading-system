@@ -1,6 +1,6 @@
 package org.djezzy.pfe.model.job;
 
-import org.djezzy.pfe.model.evaluation.*;
+import org.djezzy.pfe.model.evaluation.BaseEntity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -19,7 +19,6 @@ public class ExperienceRange extends BaseEntity {
     @Column
     private String maxYears;
 }
-
 
 
 

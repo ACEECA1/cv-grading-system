@@ -1,6 +1,6 @@
 package org.djezzy.pfe.model.auth;
 
-import org.djezzy.pfe.model.evaluation.*;
+import org.djezzy.pfe.model.evaluation.CV;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.OneToMany;
@@ -23,7 +23,6 @@ public class Candidate extends User {
     @OneToMany(mappedBy = "candidate")
     private List<CV> cvs = new ArrayList<>();
 }
-
 
 
 

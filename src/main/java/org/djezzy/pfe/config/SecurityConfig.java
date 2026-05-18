@@ -44,7 +44,6 @@ public class SecurityConfig {
                         .requestMatchers("/health").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/callbacks/**").permitAll()
-                        .requestMatchers("/api/mock/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/system/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/job-offers/public/**").permitAll()
                         .requestMatchers("/api/users/**").authenticated()

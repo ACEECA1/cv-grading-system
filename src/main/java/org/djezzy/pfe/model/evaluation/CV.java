@@ -1,7 +1,7 @@
 package org.djezzy.pfe.model.evaluation;
 
-import org.djezzy.pfe.model.auth.*;
-import org.djezzy.pfe.model.job.*;
+import org.djezzy.pfe.model.auth.Candidate;
+import org.djezzy.pfe.model.job.JobOffer;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.CascadeType;
@@ -55,7 +55,6 @@ public class CV extends BaseEntity {
     @OneToOne(mappedBy = "cv")
     private CandidateEvaluation candidateEvaluation;
 }
-
 
 
 

@@ -1,6 +1,6 @@
 package org.djezzy.pfe.model.evaluation;
 
-import org.djezzy.pfe.model.job.*;
+import org.djezzy.pfe.model.job.StructuredJd;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.CascadeType;
@@ -70,7 +70,6 @@ public class CandidateEvaluation extends BaseEntity {
         hrQuestion.setCandidateEvaluation(this);
     }
 }
-
 
 
 

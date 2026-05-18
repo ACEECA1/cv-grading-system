@@ -1,6 +1,6 @@
 package org.djezzy.pfe.model.job;
 
-import org.djezzy.pfe.model.evaluation.*;
+import org.djezzy.pfe.model.evaluation.BaseEntity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.CascadeType;
@@ -101,7 +101,6 @@ public class StructuredJd extends BaseEntity {
         qualification.setStructuredJd(this);
     }
 }
-
 
 
 

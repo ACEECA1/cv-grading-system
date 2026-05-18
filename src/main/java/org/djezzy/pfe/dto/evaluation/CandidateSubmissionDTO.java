@@ -1,6 +1,6 @@
 package org.djezzy.pfe.dto.evaluation;
 
-import org.djezzy.pfe.dto.job.*;
+import org.djezzy.pfe.dto.job.JobOfferDTO;
 
 import org.djezzy.pfe.model.evaluation.CVProcessingStatus;
 
@@ -16,7 +16,6 @@ public record CandidateSubmissionDTO(
         CandidateEvaluationDTO evaluation
 ) {
 }
-
 
 
 

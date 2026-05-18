@@ -13,7 +13,6 @@ import org.djezzy.pfe.dto.job.JobOfferDetailDTO;
 import org.djezzy.pfe.dto.job.JobOfferDTO;
 import org.djezzy.pfe.dto.job.StructuredJdDTO;
 import org.djezzy.pfe.dto.job.StructuredJdCallbackRequest;
-import org.djezzy.pfe.dto.job.TestJobOfferCreationDTO;
 import org.djezzy.pfe.dto.job.UpdateJobOfferRequest;
 import org.djezzy.pfe.model.evaluation.CV;
 import org.djezzy.pfe.model.evaluation.CandidateEvaluation;
@@ -75,29 +74,6 @@ public class JobOfferService {
         jobOfferDAO.save(jobOffer);
         triggerStructuredJdParsing(jobOffer);
         return mapperUtil.toJobOfferDto(jobOffer);
-    }
-
-    @Transactional
-    public JobOfferDTO createTestJobOfferWithStructuredJd(TestJobOfferCreationDTO request, User actor) {
-        JobOffer jobOffer = new JobOffer();
-        jobOffer.setTitle(request.title());
-        jobOffer.setRawText(request.rawText());
-        jobOffer.setStatus(JobOfferStatus.DRAFT);
-        jobOffer.setCreatedBy(actor);
-        jobOfferDAO.save(jobOffer);
-
-        StructuredJdCallbackRequest structuredRequest = new StructuredJdCallbackRequest(
-                request.title(),
-                request.companyName(),
-                request.requiredSkills(),
-                request.preferredSkills(),
-                request.experienceRange(),
-                List.of(),
-                List.of(),
-                request.workLocation(),
-                request.employmentType()
-        );
-        return applyStructuredJdCallback(jobOffer.getId(), structuredRequest);
     }
 
     @Transactional
