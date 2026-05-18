@@ -7,7 +7,3 @@ public enum JobOfferStatus {
     CLOSED,
     FAILED
 }
-
-
-
-

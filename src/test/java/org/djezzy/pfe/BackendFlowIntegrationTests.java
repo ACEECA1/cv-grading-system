@@ -42,6 +42,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -456,6 +458,94 @@ class BackendFlowIntegrationTests {
     }
 
     @Test
+    void candidate_can_retry_failed_evaluation() throws Exception {
+        User admin = userDAO.findByUsername("admin").orElseThrow();
+        String email = "retry-candidate@mail.test";
+        String token = registerAndLoginCandidate(
+                email,
+                "retry_candidate_" + UUID.randomUUID().toString().substring(0, 4),
+                "Password123"
+        );
+        Candidate candidate = (Candidate) userDAO.findByEmail(email).orElseThrow();
+
+        JobOffer offer = new JobOffer();
+        offer.setTitle("Retry Evaluation Offer");
+        offer.setRawText("Published offer for retry evaluation integration test.");
+        offer.setStatus(JobOfferStatus.PUBLISHED);
+        offer.setCreatedBy(admin);
+        offer.setJdRequestId(UUID.randomUUID().toString());
+        jobOfferDAO.save(offer);
+
+        CV cv = new CV();
+        cv.setCandidate(candidate);
+        cv.setJobOffer(offer);
+        cv.setFileUrl("target/test-uploads/retry.pdf");
+        cv.setUploadDate(Instant.now());
+        cv.setStatus(CVProcessingStatus.FAILED);
+        cvdao.save(cv);
+
+        CandidateEvaluation evaluation = new CandidateEvaluation();
+        evaluation.setCv(cv);
+        evaluation.setStructuredJd(offer.getStructuredJd());
+        evaluation.setStatus(EvaluationStatus.FAILED);
+        candidateEvaluationDAO.save(evaluation);
+        cv.setCandidateEvaluation(evaluation);
+        cvdao.save(cv);
+
+        mockMvc.perform(post("/api/candidate/submissions/{evaluationId}/retry", evaluation.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(evaluation.getId()))
+                .andExpect(jsonPath("$.data.status").value("WAITING"));
+
+        CandidateEvaluation updatedEvaluation = candidateEvaluationDAO.findById(evaluation.getId()).orElseThrow();
+        CV updatedCv = cvdao.findById(cv.getId()).orElseThrow();
+        assertThat(updatedEvaluation.getStatus()).isEqualTo(EvaluationStatus.WAITING);
+        assertThat(updatedCv.getStatus()).isEqualTo(CVProcessingStatus.UPLOADED);
+        verify(asyncWorkflowService, timeout(1000)).processCvAndSendForEvaluation(updatedCv.getId(), updatedEvaluation.getId());
+    }
+
+    @Test
+    void retry_evaluation_rejects_non_failed_status() throws Exception {
+        User admin = userDAO.findByUsername("admin").orElseThrow();
+        String email = "retry-invalid-status@mail.test";
+        String token = registerAndLoginCandidate(
+                email,
+                "retry_invalid_" + UUID.randomUUID().toString().substring(0, 4),
+                "Password123"
+        );
+        Candidate candidate = (Candidate) userDAO.findByEmail(email).orElseThrow();
+
+        JobOffer offer = new JobOffer();
+        offer.setTitle("Retry Invalid State Offer");
+        offer.setRawText("Published offer for invalid retry state integration test.");
+        offer.setStatus(JobOfferStatus.PUBLISHED);
+        offer.setCreatedBy(admin);
+        offer.setJdRequestId(UUID.randomUUID().toString());
+        jobOfferDAO.save(offer);
+
+        CV cv = new CV();
+        cv.setCandidate(candidate);
+        cv.setJobOffer(offer);
+        cv.setFileUrl("target/test-uploads/retry-invalid.pdf");
+        cv.setUploadDate(Instant.now());
+        cv.setStatus(CVProcessingStatus.UPLOADED);
+        cvdao.save(cv);
+
+        CandidateEvaluation evaluation = new CandidateEvaluation();
+        evaluation.setCv(cv);
+        evaluation.setStructuredJd(offer.getStructuredJd());
+        evaluation.setStatus(EvaluationStatus.WAITING);
+        candidateEvaluationDAO.save(evaluation);
+        cv.setCandidateEvaluation(evaluation);
+        cvdao.save(cv);
+
+        mockMvc.perform(post("/api/candidate/submissions/{evaluationId}/retry", evaluation.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
     void evaluation_callback_accepts_extended_payload_and_maps_skill_arrays() throws Exception {
         User admin = userDAO.findByUsername("admin").orElseThrow();
 
@@ -602,4 +692,3 @@ class BackendFlowIntegrationTests {
                 .asText();
     }
 }
-

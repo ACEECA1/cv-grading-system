@@ -56,6 +56,9 @@ public class CallbackService {
 
     @Transactional
     public CandidateEvaluationDTO handleEvaluationCallback(Long evaluationId, N8nEvaluationPayloadDTO payload) {
+        if (payload == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Evaluation callback payload is required");
+        }
         CandidateEvaluation evaluation = candidateEvaluationDAO.findById(evaluationId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Candidate evaluation not found"));
         CV cv = evaluation.getCv();

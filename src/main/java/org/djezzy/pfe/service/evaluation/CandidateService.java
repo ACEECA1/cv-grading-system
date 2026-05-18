@@ -3,6 +3,7 @@ package org.djezzy.pfe.service.evaluation;
 import lombok.RequiredArgsConstructor;
 import org.djezzy.pfe.dao.evaluation.CVDAO;
 import org.djezzy.pfe.dao.evaluation.CandidateEvaluationDAO;
+import org.djezzy.pfe.dto.evaluation.CandidateEvaluationDTO;
 import org.djezzy.pfe.dto.evaluation.CandidateSubmissionDTO;
 import org.djezzy.pfe.dto.job.JobOfferDTO;
 import org.djezzy.pfe.dto.evaluation.UploadCvResponseDTO;
@@ -84,6 +85,28 @@ public class CandidateService {
         return mapperUtil.toCandidateSubmissionDtos(cvdao.findByCandidateIdOrderByUploadDateDesc(user.getId()));
     }
 
+    @Transactional
+    public CandidateEvaluationDTO retryEvaluation(Long evaluationId, User user) {
+        Candidate candidate = extractCandidate(user);
+        CandidateEvaluation evaluation = candidateEvaluationDAO.findById(evaluationId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Candidate evaluation not found"));
+        CV cv = evaluation.getCv();
+        if (cv == null || cv.getCandidate() == null || !cv.getCandidate().getId().equals(candidate.getId())) {
+            throw new AppException(HttpStatus.FORBIDDEN, "You are not allowed to retry this evaluation");
+        }
+        if (evaluation.getStatus() != EvaluationStatus.FAILED) {
+            throw new IllegalStateException("Only failed evaluations can be retried");
+        }
+
+        evaluation.setStatus(EvaluationStatus.WAITING);
+        cv.setStatus(CVProcessingStatus.UPLOADED);
+        candidateEvaluationDAO.save(evaluation);
+        cvdao.save(cv);
+
+        applicationEventPublisher.publishEvent(new CvUploadedEvent(cv.getId(), evaluation.getId()));
+        return mapperUtil.toCandidateEvaluationDto(evaluation);
+    }
+
     @Transactional(readOnly = true)
     public Page<JobOfferDTO> browseJobOffers(String title, String location, Pageable pageable) {
         return jobOfferService.getPublishedJobOffers(title, location, pageable);
@@ -131,5 +154,4 @@ public class CandidateService {
         return candidate;
     }
 }
-
 

@@ -8,17 +8,23 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.djezzy.pfe.config.AppProperties;
+import org.djezzy.pfe.dao.evaluation.CVDAO;
+import org.djezzy.pfe.dao.evaluation.CandidateEvaluationDAO;
 import org.djezzy.pfe.dto.evaluation.N8nEvaluationPayloadDTO;
+import org.djezzy.pfe.model.evaluation.CV;
+import org.djezzy.pfe.model.evaluation.CVProcessingStatus;
+import org.djezzy.pfe.model.evaluation.CandidateEvaluation;
+import org.djezzy.pfe.model.evaluation.EvaluationStatus;
 import org.djezzy.pfe.service.system.CallbackService;
 import org.djezzy.pfe.util.AppException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
 import java.time.Duration;
@@ -136,6 +142,8 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
     private final ObjectMapper objectMapper;
     private final AppProperties appProperties;
     private final CallbackService callbackService;
+    private final CVDAO cvdao;
+    private final CandidateEvaluationDAO candidateEvaluationDAO;
     @Qualifier("workflowProcessorExecutor")
     private final Executor workflowProcessorExecutor;
 
@@ -305,7 +313,27 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                     Thread.currentThread().getName(),
                     input.evaluationId(),
                     ex);
+            markEvaluationFailed(input.evaluationId());
             throw ex;
+        }
+    }
+
+    private void markEvaluationFailed(Long evaluationId) {
+        CandidateEvaluation evaluation = candidateEvaluationDAO.findById(evaluationId).orElse(null);
+        if (evaluation == null) {
+            log.info("[{}][evaluationId={}] Cannot mark FAILED: evaluation no longer exists",
+                    Thread.currentThread().getName(),
+                    evaluationId);
+            return;
+        }
+
+        evaluation.setStatus(EvaluationStatus.FAILED);
+        candidateEvaluationDAO.save(evaluation);
+
+        CV cv = evaluation.getCv();
+        if (cv != null) {
+            cv.setStatus(CVProcessingStatus.FAILED);
+            cvdao.save(cv);
         }
     }
 
@@ -736,14 +764,16 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + openrouter.getApiKey())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(request)
-                    .retrieve()
-                    .onStatus(HttpStatusCode::isError, r -> r.bodyToMono(String.class)
-                            .defaultIfEmpty("")
-                            .map(body -> new AppException(
-                                    HttpStatus.BAD_GATEWAY,
-                                    "OpenRouter request failed with status " + r.statusCode().value()
-                                            + compactErrorBody(body))))
-                    .bodyToMono(OpenRouterResponse.class)
+                    .exchangeToMono(clientResponse -> {
+                        if (clientResponse.statusCode().is2xxSuccessful()) {
+                            return clientResponse.bodyToMono(OpenRouterResponse.class);
+                        }
+                        return clientResponse.bodyToMono(String.class)
+                                .defaultIfEmpty("")
+                                .flatMap(body -> Mono.error(new RuntimeException(
+                                        "OpenRouter request failed with status " + clientResponse.statusCode().value()
+                                                + compactErrorBody(body))));
+                    })
                     .timeout(Duration.ofSeconds(360))
                     .retryWhen(Retry.backoff(2, Duration.ofSeconds(2)).maxBackoff(Duration.ofSeconds(5)))
                     .block();
@@ -753,14 +783,20 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                     System.currentTimeMillis() - requestStart);
 
             if (response == null || response.choices() == null || response.choices().isEmpty()) {
-                return "{}";
+                throw new RuntimeException("OpenRouter returned an empty response payload");
             }
             String content = response.choices().get(0).message() == null ? null
                     : response.choices().get(0).message().content();
-            return isBlank(content) ? "{}" : content;
+            if (isBlank(content)) {
+                throw new RuntimeException("OpenRouter returned empty completion content");
+            }
+            return content;
+        } catch (RuntimeException e) {
+            log.error("OpenRouter API call failed for stage {}", stageName, e);
+            throw e;
         } catch (Exception e) {
-            log.error("OpenRouter API permanently failed after retries. Returning empty JSON fallback.", e);
-            return "{}";
+            log.error("OpenRouter API call failed for stage {}", stageName, e);
+            throw new RuntimeException("OpenRouter call failed for stage " + stageName, e);
         }
     }
 

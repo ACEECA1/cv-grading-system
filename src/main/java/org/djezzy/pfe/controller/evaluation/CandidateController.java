@@ -2,6 +2,7 @@ package org.djezzy.pfe.controller.evaluation;
 
 import lombok.RequiredArgsConstructor;
 import org.djezzy.pfe.dto.system.ApiResponse;
+import org.djezzy.pfe.dto.evaluation.CandidateEvaluationDTO;
 import org.djezzy.pfe.dto.evaluation.CandidateSubmissionDTO;
 import org.djezzy.pfe.dto.job.JobOfferDTO;
 import org.djezzy.pfe.dto.evaluation.UploadCvResponseDTO;
@@ -81,6 +82,17 @@ public class CandidateController {
         return ResponseEntity.ok(ApiResponse.ok("Candidate submissions", candidateService.mySubmissions(user)));
     }
 
+    @PostMapping("/submissions/{evaluationId}/retry")
+    @PreAuthorize("hasRole('CANDIDATE')")
+    public ResponseEntity<ApiResponse<CandidateEvaluationDTO>> retryEvaluation(
+            @PathVariable Long evaluationId,
+            Authentication authentication
+    ) {
+        User user = (User) authentication.getPrincipal();
+        CandidateEvaluationDTO response = candidateService.retryEvaluation(evaluationId, user);
+        return ResponseEntity.ok(ApiResponse.ok("Evaluation retry started", response));
+    }
+
     @GetMapping("/submissions/{jobOfferId}/cv/download")
     public ResponseEntity<Resource> downloadMyCv(@PathVariable Long jobOfferId, Authentication authentication) {
         User user = (User) authentication.getPrincipal();
@@ -100,5 +112,4 @@ public class CandidateController {
         return ResponseEntity.ok(ApiResponse.ok("Submission withdrawn successfully", null));
     }
 }
-
 
