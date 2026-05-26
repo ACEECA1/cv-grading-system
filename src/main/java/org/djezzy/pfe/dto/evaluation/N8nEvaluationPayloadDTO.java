@@ -135,7 +135,8 @@ public record N8nEvaluationPayloadDTO(
     public record EducationMatchDTO(
             @JsonProperty("required_degree") String requiredDegree,
             @JsonProperty("candidate_degree") String candidateDegree,
-            @JsonProperty("match_status") String matchStatus
+            @JsonProperty("match_level") String matchLevel,
+            @JsonProperty("reasoning") String reasoning
     ) {
     }
 

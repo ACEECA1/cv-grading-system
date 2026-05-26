@@ -316,7 +316,12 @@ public class CallbackService {
                 : matchScore.getEducationMatch();
         educationMatch.setRequiredDegree(hasText(payload.requiredDegree()) ? payload.requiredDegree().trim() : "Not specified");
         educationMatch.setCandidateDegree(hasText(payload.candidateDegree()) ? payload.candidateDegree().trim() : "Not specified");
-        educationMatch.setMatchStatus(hasText(payload.matchStatus()) ? payload.matchStatus().trim() : "Not specified");
+        try {
+            educationMatch.setMatchLevel(hasText(payload.matchLevel()) ? org.djezzy.pfe.model.evaluation.MatchLevel.valueOf(payload.matchLevel().toUpperCase()) : org.djezzy.pfe.model.evaluation.MatchLevel.MISMATCH);
+        } catch (IllegalArgumentException e) {
+            educationMatch.setMatchLevel(org.djezzy.pfe.model.evaluation.MatchLevel.MISMATCH);
+        }
+        educationMatch.setReasoning(hasText(payload.reasoning()) ? payload.reasoning().trim() : "Not specified");
         matchScore.setEducationMatch(educationMatch);
     }
 

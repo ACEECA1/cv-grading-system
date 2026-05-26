@@ -18,8 +18,12 @@ public class EducationMatch extends BaseEntity {
     @Column
     private String candidateDegree;
 
-    @Column
-    private String matchStatus;
+    @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+    @Column(name = "match_level")
+    private MatchLevel matchLevel;
+
+    @Column(length = 4000)
+    private String reasoning;
 }
 
 

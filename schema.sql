@@ -13,7 +13,8 @@ create table education_matches (
     id bigint not null auto_increment,
     updated_at datetime(6) not null,
     candidate_degree varchar(255),
-    match_status varchar(255),
+    match_level enum ('MATCH','MISMATCH','EXCEEDS'),
+    reasoning varchar(4000),
     required_degree varchar(255),
     primary key (id)
 ) engine=InnoDB;

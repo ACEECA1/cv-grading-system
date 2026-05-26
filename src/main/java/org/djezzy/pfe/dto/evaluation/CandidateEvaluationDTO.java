@@ -32,7 +32,8 @@ public record CandidateEvaluationDTO(
     public record EducationMatchDTO(
             String requiredDegree,
             String candidateDegree,
-            String matchStatus
+            org.djezzy.pfe.model.evaluation.MatchLevel matchLevel,
+            String reasoning
     ) {
     }
 }

@@ -93,7 +93,8 @@ public class MapperUtil {
                 : new CandidateEvaluationDTO.EducationMatchDTO(
                 matchScore.getEducationMatch().getRequiredDegree(),
                 matchScore.getEducationMatch().getCandidateDegree(),
-                matchScore.getEducationMatch().getMatchStatus()
+                matchScore.getEducationMatch().getMatchLevel(),
+                matchScore.getEducationMatch().getReasoning()
         );
         return new CandidateEvaluationDTO(
                 evaluation.getId(),

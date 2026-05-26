@@ -91,7 +91,8 @@ public class HrService {
                 : new CandidateEvaluationDTO.EducationMatchDTO(
                 matchScore.getEducationMatch().getRequiredDegree(),
                 matchScore.getEducationMatch().getCandidateDegree(),
-                matchScore.getEducationMatch().getMatchStatus()
+                matchScore.getEducationMatch().getMatchLevel(),
+                matchScore.getEducationMatch().getReasoning()
         );
         List<TechnicalQuestionDTO> technicalQuestions = evaluation.getTechnicalQuestions() == null
                 ? List.of()

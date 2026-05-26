@@ -58,16 +58,17 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
 
     private static final String CV_PARSER_PROMPT = """
             # Role & Persona
-            You are an expert CV Parser with 15+ years of experience in recruitment data extraction. Your specialty is converting unstructured resume text into precise, structured candidate profiles while maintaining 100% accuracy on dates and employment history.
+            You are an expert CV Parser with 15+ years of experience in recruitment data extraction. Your specialty is converting unstructured resume text into precise, structured candidate profiles while maintaining 100% accuracy on dates, employment history, and education.
 
             # Standard Operating Procedure
             Step 1: Scan the document sequentially.
             Step 2: Extract the candidate's work and project experience.
-            Step 3: Format the extracted data strictly into the JSON schema provided below.
+            Step 3: Extract the candidate's educational background, including degrees and institutions.
+            Step 4: Format the extracted data strictly into the JSON schema provided below.
 
             # Output Constraints
             Return ONLY valid JSON. Do not include markdown formatting or conversational text.
-            Your response must strictly match this exact schema for the experience array:
+            Your response must strictly match this exact schema for the experience and education arrays:
             {
             "experience": [
                 {
@@ -75,6 +76,15 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                 "company": "<The company, organization, or university club>",
                 "duration": "<The exact dates, e.g., 'Jan 2023 - Present' or '2022'>",
                 "description": "<A brief summary of their responsibilities and achievements>"
+                }
+            ],
+            "education": [
+                {
+                "degree": "<The degree or qualification, e.g., 'Bachelor of Science in Computer Science'>",
+                "institution": "<The university, college, or school name>",
+                "start_date": "<The start date, if available, or null>",
+                "end_date": "<The graduation or end date, e.g., '2024' or 'Present'>",
+                "honors": "<Any honors, distinctions, or GPA, if available, or null>"
                 }
             ]
             }
@@ -161,7 +171,8 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                 "education_match": {
                 "required_degree": "<string: exact degree required, e.g. 'Bachelor', or 'Not specified'>",
                 "candidate_degree": "<string: candidate's highest degree, e.g. 'Master', or 'None'>",
-                "match_status": "<string: reasoning>"
+                "match_level": "<'MATCH' | 'MISMATCH' | 'EXCEEDS'>",
+                "reasoning": "<string: explanation>"
                 },
                 "recommendation": "<string>",
                 "reasoning": "<string>"
@@ -626,7 +637,8 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
         if (source == null || source.isNull()) {
             normalizedEducation.put("required_degree", "Not specified");
             normalizedEducation.put("candidate_degree", "Not specified");
-            normalizedEducation.put("match_status", "Not specified");
+            normalizedEducation.put("match_level", "MISMATCH");
+            normalizedEducation.put("reasoning", "Not specified");
             return normalizedEducation;
         }
         if (source.isObject()) {
@@ -637,14 +649,18 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                     "candidate_degree",
                     firstNonBlank(source.path("candidate_degree").asText(null), "Not specified"));
             normalizedEducation.put(
-                    "match_status",
-                    firstNonBlank(source.path("match_status").asText(null), "Not specified"));
+                    "match_level",
+                    firstNonBlank(source.path("match_level").asText(null), "MISMATCH"));
+            normalizedEducation.put(
+                    "reasoning",
+                    firstNonBlank(source.path("reasoning").asText(null), "Not specified"));
             return normalizedEducation;
         }
 
         normalizedEducation.put("required_degree", "Not specified");
         normalizedEducation.put("candidate_degree", "Not specified");
-        normalizedEducation.put("match_status", firstNonBlank(source.asText(null), "Not specified"));
+        normalizedEducation.put("match_level", "MISMATCH");
+        normalizedEducation.put("reasoning", firstNonBlank(source.asText(null), "Not specified"));
         return normalizedEducation;
     }
 
