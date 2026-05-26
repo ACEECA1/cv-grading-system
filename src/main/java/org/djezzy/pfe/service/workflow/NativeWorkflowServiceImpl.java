@@ -58,84 +58,190 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
 
     private static final String CV_PARSER_PROMPT = """
             # Role & Persona
-            You are an expert CV Parser. Convert unstructured CV text into structured JSON.
-            Return JSON only.
-            You must extract the candidate's work and project experience.
-            Return ONLY valid JSON.
+            You are an expert CV Parser with 15+ years of experience in recruitment data extraction. Your specialty is converting unstructured resume text into precise, structured candidate profiles while maintaining 100% accuracy on dates and employment history.
+
+            # Standard Operating Procedure
+            Step 1: Scan the document sequentially.
+            Step 2: Extract the candidate's work and project experience.
+            Step 3: Format the extracted data strictly into the JSON schema provided below.
+
+            # Output Constraints
+            Return ONLY valid JSON. Do not include markdown formatting or conversational text.
             Your response must strictly match this exact schema for the experience array:
+            {
             "experience": [
-              {
+                {
                 "title": "<The job or role title>",
                 "company": "<The company, organization, or university club>",
                 "duration": "<The exact dates, e.g., 'Jan 2023 - Present' or '2022'>",
                 "description": "<A brief summary of their responsibilities and achievements>"
-              }
+                }
             ]
+            }
             """;
 
     private static final String CONSISTENCY_PROMPT = """
-            You are a CV & Job Description Matching Expert.
-            Return only valid JSON with relevance, status, skill gaps, mismatches, strengths, and recommendation.
+            You are a CV & Job Description Matching Expert. Your job is to analyze compatibility between a candidate CV and a job description. You must detect skill gaps, experience mismatches, missing requirements, and relevance score.
+
+            # Output Rules
+            - Return ONLY valid JSON.
+            - No markdown, no explanations, no extra text.
+            - Do not include any fields outside the specified schema.
+
+            # Required JSON Schema
+            {
+            "relevance_score": number (0-100),
+            "match_status": string (e.g., "Highly Recommended", "Partial Match", "Not Recommended"),
+            "skill_gaps": ["string"],
+            "experience_mismatch": boolean,
+            "missing_requirements": ["string"],
+            "strengths": ["string"],
+            "recommendation": string
+            }
+
+            # Classification Rules
+            - relevance_score: overall match percentage based on skills, experience, education, location.
+            - match_status: descriptive summary of the match quality.
+            - skill_gaps: list of required or preferred skills missing from CV.
+            - experience_mismatch: true if candidate's years of experience are below minimum required.
+            - missing_requirements: any non-skill requirements not met (e.g., missing degree, location, language).
+            - strengths: positive points of the candidate relative to the job.
+            - recommendation: brief explanation of whether to proceed and why.
+
+            # Important
+            - Be objective and data-driven.
+            - Use only the information provided in the CV and job description.
+            - If a field is not applicable, use an empty array or null as appropriate.
+
+            Now analyze the following input.        
             """;
 
     private static final String SKILLS_PROMPT = """
-            You are a Skills Standardization Expert.
-            Return only valid JSON using key "normalized_skills" with original_name, normalized_name, category, proficiency_level, years_experience.
+            You are a Skills Standardization Expert. Normalize skill names and categorize them. Return ONLY a valid JSON object, no markdown, no extra text. The JSON must have the following structure:
+            {
+            "normalized_skills": [
+                {
+                "original_name": "<string>",
+                "normalized_name": "<string>",
+                "category": "<'frontend' | 'backend' | 'database' | 'devops' | 'cloud' | 'mobile' | 'testing' | 'data_science' | 'machine_learning' | 'security' | 'design' | 'project_management' | 'soft_skills' | 'other'>",
+                "proficiency_level": "<string>",
+                "years_experience": <number>
+                }
+            ]
+            }
+
+            Examples: k8s -> Kubernetes (devops), React.js -> React (frontend), Postgres -> PostgreSQL (database).
             """;
 
     private static final String MATCHING_PROMPT = """
-            You are a Senior Talent Matching Analyst.
-            Return only valid JSON with root key "match_score" containing this strict schema:
-            "overall_match_score": <number strictly between 0.0 and 10.0, e.g., 8.5>,
-            "matched_skills": [<string>],
-            "missing_skills": [{"skill_name": "<string>", "importance": "<Low|Medium|High>"}],
-            "experience_alignment": {
-              "years_required": <integer: exact years required from JD, use 0 if none specified>,
-              "years_candidate": <integer: exact years calculated from CV, use 0 if none>,
-              "match_score": <number 0.0 to 10.0>
-            },
-            "education_match": {
-              "required_degree": "<string: exact degree required, e.g. 'Bachelor', or 'Not specified'>",
-              "candidate_degree": "<string: candidate's highest degree, e.g. 'Master', or 'None'>",
-              "match_status": "<string: reasoning>"
-            },
-            "recommendation": "<string>",
-            "reasoning": "<string>".
-            The overall_match_score MUST be a decimal number from 0.0 to 10.0. Never exceed 10 or go below 0.
+            You are a Senior Talent Matching Analyst. Your job is to compare a candidate's CV to the job requirements and calculate a precise match score.
+
+            # Output Rules
+            - Return ONLY valid JSON.
+            - No markdown, no explanations, no extra text.
+            - The JSON must have exactly one root key: "match_score".
+            - Do not include any fields outside the specified schema.
+
+            # Required JSON Schema
+            {
+            "match_score": {
+                "overall_match_score": <number strictly between 0.0 and 10.0, e.g., 8.5>,
+                "matched_skills": ["<string>"],
+                "missing_skills": [
+                {
+                    "skill_name": "<string>",
+                    "importance": "<'Low' | 'Medium' | 'High'>"
+                }
+                ],
+                "experience_alignment": {
+                "years_required": <integer: exact years required from JD, use 0 if none specified>,
+                "years_candidate": <integer: exact years calculated from CV, use 0 if none>,
+                "match_score": <number 0.0 to 10.0>
+                },
+                "education_match": {
+                "required_degree": "<string: exact degree required, e.g. 'Bachelor', or 'Not specified'>",
+                "candidate_degree": "<string: candidate's highest degree, e.g. 'Master', or 'None'>",
+                "match_status": "<string: reasoning>"
+                },
+                "recommendation": "<string>",
+                "reasoning": "<string>"
+            }
+            }
+
+            # Scoring Rules
+            - The overall_match_score MUST be a decimal number from 0.0 to 10.0. Never exceed 10 or go below 0.
+            - Score 8.0-10.0 -> recommend to hire.
+            - Score 5.0-7.9 -> recommend to interview.
+            - Score 0.0-4.9 -> recommend to reject.
+            - Be objective and data-driven. Use only the provided CV and JD data.
+
+            Now analyze the following input.
             """;
 
     private static final String TECHNICAL_PROMPT = """
-            You are a Senior Technical Interview Architect.
-            You must return ONLY valid JSON. Your response must strictly contain an array of objects under the key "technical_questions" matching this exact schema:
+            You are a Senior Technical Interview Architect. Your task is to generate 5 to 7 technical interview questions based on the candidate's CV and the job description provided.
+
+            # Output Rules
+            - Return ONLY valid JSON.
+            - No markdown, no explanations, no extra text.
+            - The JSON must have exactly one root key: "technical_questions".
+            - Do not include any fields outside the specified schema.
+
+            # Required JSON Schema
             {
-              "technical_questions": [
+            "technical_questions": [
                 {
-                  "question": "<The technical question>",
-                  "expected_answer": "<The expected correct answer>",
-                  "difficulty": "<Beginner/Intermediate/Advanced/Expert>",
-                  "skill_area": "<The specific skill being tested>",
-                  "bluff_indicator": <boolean: true if this question is designed to catch candidates exaggerating their skills>,
-                  "follow_up_questions": ["<follow up 1>", "<follow up 2>"]
+                "question": "<The technical question>",
+                "expected_answer": "<The expected correct answer>",
+                "difficulty": "<'Beginner' | 'Intermediate' | 'Advanced' | 'Expert'>",
+                "skill_area": "<The specific skill being tested>",
+                "bluff_indicator": <boolean: true if this question is designed to catch candidates exaggerating their skills>,
+                "follow_up_questions": ["<follow up 1>", "<follow up 2>"]
                 }
-              ]
+            ]
             }
+
+            # Distribution Rules
+            - Provide a balanced mix: 2 Beginner/Intermediate questions, 2-3 Advanced questions, and 1-2 Expert questions.
+
+            # Bluff Indicator Logic
+            - Set bluff_indicator to true for questions specifically designed to test the true depth of claimed expertise (e.g., advanced framework internals, performance edge cases, or common misconceptions).
+
+            Now generate the technical questions.
             """;
 
     private static final String HR_PROMPT = """
-            You are an HR Behavioral Interview Specialist.
-            You must return ONLY valid JSON. Your response must strictly contain an array of objects under the key "hr_questions" matching this exact schema:
+            You are an HR Behavioral Interview Specialist. Your task is to generate exactly 4 behavioral interview questions based on the candidate's CV and the job description provided.
+
+            # Output Rules
+            - Return ONLY valid JSON.
+            - No markdown, no explanations, no extra text.
+            - The JSON must have exactly one root key: "hr_questions".
+            - Do not include any fields outside the specified schema.
+
+            # Required JSON Schema
             {
-              "hr_questions": [
+            "hr_questions": [
                 {
-                  "question": "<The behavioral/HR question>",
-                  "psychological_intent": "<What this question is actually trying to reveal about the candidate>",
-                  "evaluation_criteria": "<How to grade the candidate's answer>",
-                  "ideal_response_indicators": ["<indicator 1>", "<indicator 2>"],
-                  "red_flags": ["<warning sign 1>", "<warning sign 2>"],
-                  "follow_up_probes": ["<probe 1>", "<probe 2>"]
+                "question": "<The behavioral/HR question>",
+                "psychological_intent": "<What this question is actually trying to reveal about the candidate>",
+                "evaluation_criteria": "<How to grade the candidate's answer>",
+                "ideal_response_indicators": ["<indicator 1>", "<indicator 2>"],
+                "red_flags": ["<warning sign 1>", "<warning sign 2>"],
+                "follow_up_probes": ["<probe 1>", "<probe 2>"]
                 }
-              ]
+            ]
             }
+
+            # Focus Areas
+            Ensure the questions cover a mix of the following areas:
+            - Cultural fit
+            - Motivation
+            - Teamwork
+            - Conflict resolution
+            - Career goals
+
+            Now generate the behavioral questions.
             """;
 
     private final WebClient webClient;
