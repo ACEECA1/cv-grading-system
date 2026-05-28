@@ -22,8 +22,14 @@ public record CandidateEvaluationDTO(
     ) {
     }
 
+    public record YearsRequiredDTO(
+            Integer min,
+            Integer max
+    ) {
+    }
+
     public record ExperienceAlignmentDTO(
-            Integer yearsRequired,
+            YearsRequiredDTO yearsRequired,
             Integer yearsCandidate,
             Double matchScore
     ) {

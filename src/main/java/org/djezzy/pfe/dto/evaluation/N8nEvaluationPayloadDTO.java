@@ -123,8 +123,15 @@ public record N8nEvaluationPayloadDTO(
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    public record YearsRequiredPayloadDTO(
+            Integer min,
+            Integer max
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record ExperienceAlignmentDTO(
-            @JsonProperty("years_required") Integer yearsRequired,
+            @JsonProperty("years_required") YearsRequiredPayloadDTO yearsRequired,
             @JsonProperty("years_candidate") Integer yearsCandidate,
             @JsonProperty("match_score")
             Double matchScore

@@ -419,9 +419,11 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                     matchScore = Math.max(0.0, Math.min(10.0, matchScore));
                     matchScore = Math.round(matchScore * 10.0) / 10.0;
                     
-                    ((ObjectNode) experienceAlignment).put("matchScore", matchScore);
-                    ((ObjectNode) experienceAlignment).put("yearsRequired", minRequired);
-                    ((ObjectNode) experienceAlignment).put("maxYearsRequired", maxRequired);
+                    ObjectNode yrsObj = objectMapper.createObjectNode();
+                    yrsObj.put("min", minRequired);
+                    yrsObj.put("max", maxRequired);
+                    ((ObjectNode) experienceAlignment).set("yearsRequired", yrsObj);
+                    ((ObjectNode) experienceAlignment).remove("maxYearsRequired");
                 }
             }
 
@@ -686,13 +688,22 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
 
     private ObjectNode normalizeExperienceAlignment(JsonNode source) {
         ObjectNode normalizedAlignment = objectMapper.createObjectNode();
-        Integer yearsRequired = 0;
+        JsonNode yrsReqNode = source != null && source.isObject() ? source.path("years_required") : null;
+        ObjectNode yearsRequiredObj = objectMapper.createObjectNode();
+        if (yrsReqNode != null && yrsReqNode.isObject()) {
+             yearsRequiredObj.put("min", firstNonNull(parseInteger(yrsReqNode.path("min")), 0));
+             yearsRequiredObj.put("max", firstNonNull(parseInteger(yrsReqNode.path("max")), 0));
+        } else {
+             int yr = yrsReqNode != null ? firstNonNull(parseInteger(yrsReqNode), 0) : 0;
+             yearsRequiredObj.put("min", yr);
+             yearsRequiredObj.put("max", yr);
+        }
+        
         Integer yearsCandidate = 0;
         Double matchScore = 0.0;
 
         if (source != null && !source.isNull()) {
             if (source.isObject()) {
-                yearsRequired = firstNonNull(parseInteger(source.path("years_required")), 0);
                 yearsCandidate = firstNonNull(parseInteger(source.path("years_candidate")), 0);
                 JsonNode matchNode = source.has("match_score") ? source.path("match_score") : source.path("match_percentage");
                 Double parsedMatch = parseDouble(matchNode);
@@ -703,7 +714,7 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
             }
         }
 
-        normalizedAlignment.put("years_required", yearsRequired);
+        normalizedAlignment.set("years_required", yearsRequiredObj);
         normalizedAlignment.put("years_candidate", yearsCandidate);
         normalizedAlignment.put("match_score", matchScore);
         normalizedAlignment.remove("match_percentage");

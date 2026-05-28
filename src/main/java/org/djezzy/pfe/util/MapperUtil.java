@@ -84,7 +84,10 @@ public class MapperUtil {
         CandidateEvaluationDTO.ExperienceAlignmentDTO experienceAlignment = matchScore == null || matchScore.getExperienceAlignment() == null
                 ? null
                 : new CandidateEvaluationDTO.ExperienceAlignmentDTO(
-                toIntegerYears(matchScore.getExperienceAlignment().getYearsRequired()),
+                new CandidateEvaluationDTO.YearsRequiredDTO(
+                        toIntegerYears(matchScore.getExperienceAlignment().getMinYearsRequired()),
+                        toIntegerYears(matchScore.getExperienceAlignment().getMaxYearsRequired())
+                ),
                 toIntegerYears(matchScore.getExperienceAlignment().getYearsCandidate()),
                 matchScore.getExperienceAlignment().getMatchPercentage()
         );

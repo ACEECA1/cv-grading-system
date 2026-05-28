@@ -13,7 +13,10 @@ import lombok.Setter;
 @Table(name = "experience_alignments")
 public class ExperienceAlignment extends BaseEntity {
     @Column
-    private Double yearsRequired;
+    private Double minYearsRequired;
+
+    @Column
+    private Double maxYearsRequired;
 
     @Column
     private Double yearsCandidate;

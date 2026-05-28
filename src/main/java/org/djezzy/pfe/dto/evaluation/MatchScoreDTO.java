@@ -23,7 +23,7 @@ public record MatchScoreDTO(
 ) {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ExperienceAlignmentPayload(
-            @JsonAlias("years_required") String yearsRequired,
+            @JsonAlias("years_required") Object yearsRequired,
             @JsonAlias("years_candidate") String yearsCandidate,
             @JsonAlias({"match_percentage", "match_score"}) String matchPercentage
     ) {

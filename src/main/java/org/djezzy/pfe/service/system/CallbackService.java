@@ -294,7 +294,13 @@ public class CallbackService {
         ExperienceAlignment experienceAlignment = matchScore.getExperienceAlignment() == null
                 ? new ExperienceAlignment()
                 : matchScore.getExperienceAlignment();
-        experienceAlignment.setYearsRequired(payload.yearsRequired() == null ? 0.0 : payload.yearsRequired().doubleValue());
+        if (payload.yearsRequired() != null) {
+            experienceAlignment.setMinYearsRequired(payload.yearsRequired().min() == null ? 0.0 : payload.yearsRequired().min().doubleValue());
+            experienceAlignment.setMaxYearsRequired(payload.yearsRequired().max() == null ? 0.0 : payload.yearsRequired().max().doubleValue());
+        } else {
+            experienceAlignment.setMinYearsRequired(0.0);
+            experienceAlignment.setMaxYearsRequired(0.0);
+        }
         experienceAlignment.setYearsCandidate(payload.yearsCandidate() == null ? 0.0 : payload.yearsCandidate().doubleValue());
         Double alignmentScore = payload.matchScore();
         if (alignmentScore == null) {
