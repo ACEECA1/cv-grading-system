@@ -371,10 +371,20 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
             JsonNode matchingResult = timedStage("Matching Engine", input.evaluationId(),
                     () -> requestMatching(matchingInput));
 
-            if (matchingResult != null && matchingResult.isObject() && matchingResult.has("experienceAlignment")) {
-                JsonNode experienceAlignment = matchingResult.get("experienceAlignment");
-                if (experienceAlignment.isObject()) {
-                    double yearsCandidate = experienceAlignment.has("yearsCandidate") && !experienceAlignment.get("yearsCandidate").isNull() ? experienceAlignment.get("yearsCandidate").asDouble(0.0) : 0.0;
+            if (matchingResult != null && matchingResult.isObject()) {
+                JsonNode matchScoreNode = matchingResult.has("match_score") ? matchingResult.get("match_score") : matchingResult;
+                if (matchScoreNode != null && matchScoreNode.isObject()) {
+                    JsonNode experienceAlignment = matchScoreNode.get("experience_alignment");
+                    if (experienceAlignment == null || experienceAlignment.isNull() || experienceAlignment.isMissingNode()) {
+                        experienceAlignment = matchScoreNode.get("experienceAlignment");
+                    }
+                    if (experienceAlignment != null && experienceAlignment.isObject()) {
+                        double yearsCandidate = 0.0;
+                        if (experienceAlignment.has("years_candidate") && !experienceAlignment.get("years_candidate").isNull()) {
+                            yearsCandidate = experienceAlignment.get("years_candidate").asDouble(0.0);
+                        } else if (experienceAlignment.has("yearsCandidate") && !experienceAlignment.get("yearsCandidate").isNull()) {
+                            yearsCandidate = experienceAlignment.get("yearsCandidate").asDouble(0.0);
+                        }
                     
                     double minRequired = 0.0;
                     double maxRequired = 0.0;
@@ -422,8 +432,9 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                     ObjectNode yrsObj = objectMapper.createObjectNode();
                     yrsObj.put("min", minRequired);
                     yrsObj.put("max", maxRequired);
-                    ((ObjectNode) experienceAlignment).set("yearsRequired", yrsObj);
-                    ((ObjectNode) experienceAlignment).remove("maxYearsRequired");
+                    ((ObjectNode) experienceAlignment).set("years_required", yrsObj);
+                    ((ObjectNode) experienceAlignment).remove("yearsRequired");
+                }
                 }
             }
 
@@ -689,6 +700,9 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
     private ObjectNode normalizeExperienceAlignment(JsonNode source) {
         ObjectNode normalizedAlignment = objectMapper.createObjectNode();
         JsonNode yrsReqNode = source != null && source.isObject() ? source.path("years_required") : null;
+        if (yrsReqNode == null || yrsReqNode.isMissingNode()) {
+            yrsReqNode = source != null && source.isObject() ? source.path("yearsRequired") : null;
+        }
         ObjectNode yearsRequiredObj = objectMapper.createObjectNode();
         if (yrsReqNode != null && yrsReqNode.isObject()) {
              yearsRequiredObj.put("min", firstNonNull(parseInteger(yrsReqNode.path("min")), 0));
