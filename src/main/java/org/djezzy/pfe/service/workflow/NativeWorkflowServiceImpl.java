@@ -270,6 +270,7 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
     private final TransactionTemplate transactionTemplate;
     @Qualifier("workflowProcessorExecutor")
     private final Executor workflowProcessorExecutor;
+    private final WorkflowSseService workflowSseService;
 
     @Override
     public void processWorkflow(Map<String, Object> payload) {
@@ -284,6 +285,7 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                             Thread.currentThread().getName(),
                             input.evaluationId(),
                             error);
+                    workflowSseService.fail(input.evaluationId(), "Workflow failed: " + error.getMessage());
                     return null;
                 });
     }
@@ -296,8 +298,10 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                 input.evaluationId());
 
         try {
+            workflowSseService.sendProgress(input.evaluationId(), 10, "Extracting text from CV...");
             JsonNode profileData = timedStage("CV Parsing", input.evaluationId(),
                     () -> requestCvParser(input.cvText()));
+            workflowSseService.sendProgress(input.evaluationId(), 25, "Analyzing candidate profile...");
             ObjectNode combinedPayload = timedStage("Combine CV + Job Description", input.evaluationId(), () -> {
                 ObjectNode payload = objectMapper.createObjectNode();
                 payload.set("cv", profileData);
@@ -336,6 +340,7 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                 CompletableFuture.allOf(consistencyFuture, skillsFuture, contactFuture).join();
                 return true;
             });
+            workflowSseService.sendProgress(input.evaluationId(), 50, "Validating consistency & skills...");
 
             JsonNode consistencyResult = (JsonNode) stageResults.get("consistency");
             JsonNode skillsResult = (JsonNode) stageResults.get("skills");
@@ -370,6 +375,7 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
 
             JsonNode matchingResult = timedStage("Matching Engine", input.evaluationId(),
                     () -> requestMatching(matchingInput));
+            workflowSseService.sendProgress(input.evaluationId(), 75, "Generating match score...");
 
             if (matchingResult != null && matchingResult.isObject()) {
                 JsonNode matchScoreNode = matchingResult.has("match_score") ? matchingResult.get("match_score") : matchingResult;
@@ -459,6 +465,7 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                 CompletableFuture.allOf(technicalFuture, hrFuture).join();
                 return true;
             });
+            workflowSseService.sendProgress(input.evaluationId(), 90, "Generating interview questions...");
 
             JsonNode technicalResult = (JsonNode) stageResults.get("technical");
             JsonNode hrResult = (JsonNode) stageResults.get("hr");
@@ -500,11 +507,14 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                     Thread.currentThread().getName(),
                     input.evaluationId(),
                     System.currentTimeMillis() - startedAt);
+            
+            workflowSseService.complete(input.evaluationId());
         } catch (Exception ex) {
             log.error("[{}][evaluationId={}] Native workflow pipeline aborted",
                     Thread.currentThread().getName(),
                     input.evaluationId(),
                     ex);
+            workflowSseService.fail(input.evaluationId(), ex.getMessage());
             markEvaluationFailed(input.evaluationId());
             throw ex;
         } finally {
