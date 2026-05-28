@@ -190,7 +190,9 @@ public class LlmParsingService {
         payload.put("temperature", 0.2);
         payload.put("max_tokens", 50000);
         payload.put("reasoning", Map.of("enabled", false));
-        payload.put("response_format", Map.of("type", "json_object"));
+        if (!openrouter.getModel().contains("stepfun")) {
+            payload.put("response_format", Map.of("type", "json_object"));
+        }
         return payload;
     }
 
@@ -204,7 +206,9 @@ public class LlmParsingService {
         payload.put("temperature", 0);
         payload.put("max_tokens", 50000);
         payload.put("reasoning", Map.of("enabled", false));
-        payload.put("response_format", Map.of("type", "json_object"));
+        if (!openrouter.getModel().contains("stepfun")) {
+            payload.put("response_format", Map.of("type", "json_object"));
+        }
         return payload;
     }
 

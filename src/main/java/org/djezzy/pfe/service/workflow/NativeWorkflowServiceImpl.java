@@ -371,6 +371,60 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
             JsonNode matchingResult = timedStage("Matching Engine", input.evaluationId(),
                     () -> requestMatching(matchingInput));
 
+            if (matchingResult != null && matchingResult.isObject() && matchingResult.has("experienceAlignment")) {
+                JsonNode experienceAlignment = matchingResult.get("experienceAlignment");
+                if (experienceAlignment.isObject()) {
+                    double yearsCandidate = experienceAlignment.has("yearsCandidate") && !experienceAlignment.get("yearsCandidate").isNull() ? experienceAlignment.get("yearsCandidate").asDouble(0.0) : 0.0;
+                    
+                    double minRequired = 0.0;
+                    double maxRequired = 0.0;
+                    if (input.jobDescription() != null && !input.jobDescription().isBlank()) {
+                        try {
+                            JsonNode jdNode = objectMapper.readTree(input.jobDescription());
+                            if (jdNode.has("experience_range")) {
+                                JsonNode expRange = jdNode.get("experience_range");
+                                if (expRange.has("min_years") && !expRange.get("min_years").isNull()) {
+                                    minRequired = expRange.get("min_years").asDouble(0.0);
+                                }
+                                if (expRange.has("max_years") && !expRange.get("max_years").isNull()) {
+                                    maxRequired = expRange.get("max_years").asDouble(0.0);
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.warn("Failed to parse JD for experience calculation", e);
+                        }
+                    }
+
+                    double matchScore = 0.0;
+                    if (minRequired <= 0 && maxRequired <= 0) {
+                        matchScore = 10.0;
+                    } else if (maxRequired > minRequired && minRequired > 0) {
+                        if (yearsCandidate >= maxRequired) {
+                            matchScore = 10.0;
+                        } else if (yearsCandidate <= minRequired) {
+                            matchScore = (yearsCandidate / minRequired) * 7.0;
+                        } else {
+                            matchScore = 7.0 + ((yearsCandidate - minRequired) / (maxRequired - minRequired)) * 3.0;
+                        }
+                    } else if (minRequired > 0) {
+                        if (yearsCandidate >= minRequired) {
+                            matchScore = 10.0;
+                        } else {
+                            matchScore = (yearsCandidate / minRequired) * 10.0;
+                        }
+                    } else {
+                        matchScore = 10.0;
+                    }
+                    
+                    matchScore = Math.max(0.0, Math.min(10.0, matchScore));
+                    matchScore = Math.round(matchScore * 10.0) / 10.0;
+                    
+                    ((ObjectNode) experienceAlignment).put("matchScore", matchScore);
+                    ((ObjectNode) experienceAlignment).put("yearsRequired", minRequired);
+                    ((ObjectNode) experienceAlignment).put("maxYearsRequired", maxRequired);
+                }
+            }
+
             CompletableFuture<Void> technicalFuture = CompletableFuture
                     .supplyAsync(() -> timedStage("Technical Questions Generation", input.evaluationId(),
                             () -> requestTechnicalQuestions(matchingResult)), workflowProcessorExecutor)
@@ -590,6 +644,8 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
         double finalScore = parsedScore == null ? 0.0 : parsedScore;
         if (finalScore > 10.0) {
             finalScore = finalScore / 10.0;
+        } else if (finalScore <= 1.0 && finalScore > 0.0) {
+            finalScore = finalScore * 10.0;
         }
         finalScore = Math.min(Math.max(finalScore, 0.0), 10.0);
         node.put("overall_score", Math.round(finalScore * 100.0) / 100.0);
@@ -705,6 +761,8 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
         double normalized = value;
         if (normalized > 10.0) {
             normalized = normalized / 10.0;
+        } else if (normalized <= 1.0 && normalized > 0.0) {
+            normalized = normalized * 10.0;
         }
         normalized = Math.max(0.0, Math.min(normalized, 10.0));
         return Math.round(normalized * 100.0) / 100.0;
@@ -734,22 +792,6 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
         } catch (NumberFormatException ex) {
             return null;
         }
-    }
-
-    private void putNullableDouble(ObjectNode node, String field, Double value) {
-        if (value == null) {
-            node.putNull(field);
-            return;
-        }
-        node.put(field, value);
-    }
-
-    private void putNullableText(ObjectNode node, String field, String value) {
-        if (isBlank(value)) {
-            node.putNull(field);
-            return;
-        }
-        node.put(field, value);
     }
 
     private void coerceTextField(ObjectNode node, String field) {
@@ -878,7 +920,8 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
             throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "OpenRouter configuration is incomplete");
         }
 
-        Map<String, String> responseFormat = enforceJsonMode ? Map.of("type", "json_object") : null;
+        boolean supportsJsonMode = !openrouter.getModel().contains("stepfun");
+        Map<String, String> responseFormat = (enforceJsonMode && supportsJsonMode) ? Map.of("type", "json_object") : null;
         OpenRouterRequest request = new OpenRouterRequest(
                 openrouter.getModel(),
                 List.of(
