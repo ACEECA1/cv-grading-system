@@ -33,8 +33,6 @@ import org.djezzy.pfe.util.EmailUtil;
 import org.djezzy.pfe.util.JwtUtil;
 import org.djezzy.pfe.util.MapperUtil;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,7 +53,6 @@ public class AuthService {
     private final PasswordResetTokenDAO passwordResetTokenDAO;
     private final RefreshTokenDAO refreshTokenDAO;
     private final PasswordEncoder passwordEncoder;
-    private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
     private final CodeGeneratorUtil codeGeneratorUtil;
     private final EmailUtil emailUtil;
@@ -161,11 +158,7 @@ public class AuthService {
                 .or(() -> userDAO.findByEmail(request.usernameOrEmail()))
                 .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
 
-        try {
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(user.getUsername(), request.password())
-            );
-        } catch (Exception e) {
+        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new AppException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
         }
 
