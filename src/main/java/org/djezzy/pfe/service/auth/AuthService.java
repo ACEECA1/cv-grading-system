@@ -161,16 +161,20 @@ public class AuthService {
                 .or(() -> userDAO.findByEmail(request.usernameOrEmail()))
                 .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
 
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(user.getUsername(), request.password())
+            );
+        } catch (Exception e) {
+            throw new AppException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+        }
+
         if (!Boolean.TRUE.equals(user.getIsEnabled())) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Account is not verified");
+            throw new AppException(HttpStatus.FORBIDDEN, "UNVERIFIED_ACCOUNT");
         }
         if (user.getRole() == Role.HR && user.getRhApprovalStatus() != RhApprovalStatus.APPROVED) {
             throw new AppException(HttpStatus.FORBIDDEN, "HR account is pending admin approval");
         }
-
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(user.getUsername(), request.password())
-        );
 
         revokeActiveTokens(user);
         String accessToken = jwtUtil.generateAccessToken(user);
