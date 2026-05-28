@@ -11,6 +11,7 @@ import org.djezzy.pfe.event.CvUploadedEvent;
 import org.djezzy.pfe.model.evaluation.CV;
 import org.djezzy.pfe.model.evaluation.CVProcessingStatus;
 import org.djezzy.pfe.model.auth.Candidate;
+import org.djezzy.pfe.event.EvaluationCancelledEvent;
 import org.djezzy.pfe.model.evaluation.CandidateEvaluation;
 import org.djezzy.pfe.model.evaluation.EvaluationStatus;
 import org.djezzy.pfe.model.job.JobOffer;
@@ -155,6 +156,8 @@ public class CandidateService {
             fileStorageUtil.deleteIfExists(cv.getFileUrl());
         }
         cvdao.delete(cv);
+        
+        applicationEventPublisher.publishEvent(new EvaluationCancelledEvent(evaluationId));
     }
 
     private Candidate extractCandidate(User user) {

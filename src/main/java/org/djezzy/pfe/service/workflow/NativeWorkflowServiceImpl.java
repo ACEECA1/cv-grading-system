@@ -19,10 +19,12 @@ import org.djezzy.pfe.service.system.CallbackService;
 import org.djezzy.pfe.util.AppException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
@@ -38,11 +40,15 @@ import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.djezzy.pfe.event.EvaluationCancelledEvent;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "app.automation", name = "use-n8n", havingValue = "false")
 public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
+    private final Map<Long, Thread> activeThreads = new ConcurrentHashMap<>();
+
     private static final Pattern THINK_TAGS_PATTERN = Pattern.compile("(?s)<think>.*?</think>");
     private static final Pattern JSON_OBJECT_PATTERN = Pattern.compile("\\{[\\s\\S]*}");
     private static final Pattern EMAIL_PATTERN = Pattern
@@ -261,6 +267,7 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
     private final CallbackService callbackService;
     private final CVDAO cvdao;
     private final CandidateEvaluationDAO candidateEvaluationDAO;
+    private final TransactionTemplate transactionTemplate;
     @Qualifier("workflowProcessorExecutor")
     private final Executor workflowProcessorExecutor;
 
@@ -282,6 +289,7 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
     }
 
     private void runNativeWorkflow(WorkflowInput input) {
+        activeThreads.put(input.evaluationId(), Thread.currentThread());
         long startedAt = System.currentTimeMillis();
         log.debug("[{}][evaluationId={}] Native workflow pipeline started",
                 Thread.currentThread().getName(),
@@ -432,26 +440,40 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                     ex);
             markEvaluationFailed(input.evaluationId());
             throw ex;
+        } finally {
+            activeThreads.remove(input.evaluationId());
+        }
+    }
+
+    @EventListener
+    public void onEvaluationCancelled(EvaluationCancelledEvent event) {
+        Thread thread = activeThreads.get(event.evaluationId());
+        if (thread != null) {
+            log.info("Interrupting active workflow for evaluation {}", event.evaluationId());
+            thread.interrupt();
         }
     }
 
     private void markEvaluationFailed(Long evaluationId) {
-        CandidateEvaluation evaluation = candidateEvaluationDAO.findById(evaluationId).orElse(null);
-        if (evaluation == null) {
-            log.info("[{}][evaluationId={}] Cannot mark FAILED: evaluation no longer exists",
-                    Thread.currentThread().getName(),
-                    evaluationId);
-            return;
-        }
+        transactionTemplate.execute(status -> {
+            CandidateEvaluation evaluation = candidateEvaluationDAO.findById(evaluationId).orElse(null);
+            if (evaluation == null) {
+                log.info("[{}][evaluationId={}] Cannot mark FAILED: evaluation no longer exists",
+                        Thread.currentThread().getName(),
+                        evaluationId);
+                return null;
+            }
 
-        evaluation.setStatus(EvaluationStatus.FAILED);
-        candidateEvaluationDAO.save(evaluation);
+            evaluation.setStatus(EvaluationStatus.FAILED);
+            candidateEvaluationDAO.save(evaluation);
 
-        CV cv = evaluation.getCv();
-        if (cv != null) {
-            cv.setStatus(CVProcessingStatus.FAILED);
-            cvdao.save(cv);
-        }
+            CV cv = evaluation.getCv();
+            if (cv != null) {
+                cv.setStatus(CVProcessingStatus.FAILED);
+                cvdao.save(cv);
+            }
+            return null;
+        });
     }
 
     private ObjectNode buildFinalResponse(
@@ -821,28 +843,28 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
     }
 
     private JsonNode requestCvParser(String cvText) {
-        return callOpenRouterJson("CV Parsing", CV_PARSER_PROMPT, toJson(cvText), 0.2, 30000, true);
+        return callOpenRouterJson("CV Parsing", CV_PARSER_PROMPT, toJson(cvText), 0.2, 4096, true);
     }
 
     private JsonNode requestConsistencyCheck(JsonNode input) {
-        return callOpenRouterJson("Consistency Validation", CONSISTENCY_PROMPT, toJsonTwice(input), 0.2, 30000, false);
+        return callOpenRouterJson("Consistency Validation", CONSISTENCY_PROMPT, toJsonTwice(input), 0.2, 4096, false);
     }
 
     private JsonNode requestSkillsNormalization(JsonNode input) {
-        return callOpenRouterJson("Skills Taxonomy", SKILLS_PROMPT, toJsonTwice(input), 0.2, 20000, false);
+        return callOpenRouterJson("Skills Taxonomy", SKILLS_PROMPT, toJsonTwice(input), 0.2, 4096, false);
     }
 
     private JsonNode requestMatching(JsonNode input) {
-        return callOpenRouterJson("Matching Engine", MATCHING_PROMPT, toJsonTwice(input), 0.2, 100000, false);
+        return callOpenRouterJson("Matching Engine", MATCHING_PROMPT, toJsonTwice(input), 0.2, 8192, false);
     }
 
     private JsonNode requestTechnicalQuestions(JsonNode input) {
-        return callOpenRouterJson("Technical Questions Generation", TECHNICAL_PROMPT, toJsonTwice(input), 0.7, 100000,
+        return callOpenRouterJson("Technical Questions Generation", TECHNICAL_PROMPT, toJsonTwice(input), 0.7, 4096,
                 true);
     }
 
     private JsonNode requestHrQuestions(JsonNode input) {
-        return callOpenRouterJson("HR Questions Generation", HR_PROMPT, toJsonTwice(input), 0.7, 100000, true);
+        return callOpenRouterJson("HR Questions Generation", HR_PROMPT, toJsonTwice(input), 0.7, 4096, true);
     }
 
     private JsonNode callOpenRouterJson(String stageName, String systemPrompt, String userContent, double temperature,
@@ -874,52 +896,66 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
 
     private String callOpenRouterJsonContent(String stageName, AppProperties.Openrouter openrouter,
             OpenRouterRequest request) {
-        long requestStart = System.currentTimeMillis();
-        log.debug("[{}][stage={}] OpenRouter HTTP request started (model={}, maxTokens={})",
-                Thread.currentThread().getName(),
-                stageName,
-                openrouter.getModel(),
-                request.maxTokens());
-        try {
-            OpenRouterResponse response = webClient.post()
-                    .uri(openrouter.getUrl())
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + openrouter.getApiKey())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(request)
-                    .exchangeToMono(clientResponse -> {
-                        if (clientResponse.statusCode().is2xxSuccessful()) {
-                            return clientResponse.bodyToMono(OpenRouterResponse.class);
-                        }
-                        return clientResponse.bodyToMono(String.class)
-                                .defaultIfEmpty("")
-                                .flatMap(body -> Mono.error(new RuntimeException(
-                                        "OpenRouter request failed with status " + clientResponse.statusCode().value()
-                                                + compactErrorBody(body))));
-                    })
-                    .timeout(Duration.ofSeconds(360))
-                    .retryWhen(Retry.backoff(2, Duration.ofSeconds(2)).maxBackoff(Duration.ofSeconds(5)))
-                    .block();
-            log.debug("[{}][stage={}] OpenRouter HTTP request completed in {} ms",
+        int maxRetries = 3;
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            long requestStart = System.currentTimeMillis();
+            log.debug("[{}][stage={}] OpenRouter HTTP request started (model={}, maxTokens={}, attempt={})",
                     Thread.currentThread().getName(),
                     stageName,
-                    System.currentTimeMillis() - requestStart);
+                    openrouter.getModel(),
+                    request.maxTokens(),
+                    attempt);
+            try {
+                OpenRouterResponse response = webClient.post()
+                        .uri(openrouter.getUrl())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + openrouter.getApiKey())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(request)
+                        .exchangeToMono(clientResponse -> {
+                            if (clientResponse.statusCode().is2xxSuccessful()) {
+                                return clientResponse.bodyToMono(OpenRouterResponse.class);
+                            }
+                            return clientResponse.bodyToMono(String.class)
+                                    .defaultIfEmpty("")
+                                    .flatMap(body -> Mono.error(new RuntimeException(
+                                            "OpenRouter request failed with status " + clientResponse.statusCode().value()
+                                                    + compactErrorBody(body))));
+                        })
+                        .timeout(Duration.ofSeconds(360))
+                        .retryWhen(Retry.backoff(2, Duration.ofSeconds(2)).maxBackoff(Duration.ofSeconds(5)))
+                        .block();
+                log.debug("[{}][stage={}] OpenRouter HTTP request completed in {} ms",
+                        Thread.currentThread().getName(),
+                        stageName,
+                        System.currentTimeMillis() - requestStart);
 
-            if (response == null || response.choices() == null || response.choices().isEmpty()) {
-                throw new RuntimeException("OpenRouter returned an empty response payload");
+                if (response == null || response.choices() == null || response.choices().isEmpty()) {
+                    throw new RuntimeException("OpenRouter returned an empty response payload");
+                }
+                String content = response.choices().get(0).message() == null ? null
+                        : response.choices().get(0).message().content();
+                if (isBlank(content)) {
+                    throw new RuntimeException("OpenRouter returned empty completion content");
+                }
+                return content;
+            } catch (RuntimeException e) {
+                if (attempt == maxRetries) {
+                    log.error("OpenRouter API call failed for stage {}", stageName, e);
+                    throw e;
+                }
+                log.warn("OpenRouter call failed (attempt {}), retrying...", attempt, e);
+                try {
+                    Thread.sleep(2000L * attempt);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw e;
+                }
+            } catch (Exception e) {
+                log.error("OpenRouter API call failed for stage {}", stageName, e);
+                throw new RuntimeException("OpenRouter call failed for stage " + stageName, e);
             }
-            String content = response.choices().get(0).message() == null ? null
-                    : response.choices().get(0).message().content();
-            if (isBlank(content)) {
-                throw new RuntimeException("OpenRouter returned empty completion content");
-            }
-            return content;
-        } catch (RuntimeException e) {
-            log.error("OpenRouter API call failed for stage {}", stageName, e);
-            throw e;
-        } catch (Exception e) {
-            log.error("OpenRouter API call failed for stage {}", stageName, e);
-            throw new RuntimeException("OpenRouter call failed for stage " + stageName, e);
         }
+        return null;
     }
 
     private JsonNode parseJsonFromLlmContent(String content) {
