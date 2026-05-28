@@ -46,6 +46,11 @@ public class CandidateService {
     public UploadCvResponseDTO uploadCv(Long jobOfferId, MultipartFile file, User user) {
         Candidate candidate = extractCandidate(user);
 
+        boolean hasApplied = cvdao.findTopByCandidateIdAndJobOfferIdOrderByUploadDateDesc(candidate.getId(), jobOfferId).isPresent();
+        if (hasApplied) {
+            throw new AppException(HttpStatus.CONFLICT, "You have already applied for this job offer. Please withdraw your previous application first.");
+        }
+
         JobOffer jobOffer = jobOfferService.findJobOffer(jobOfferId);
         if (jobOffer.getStatus() != JobOfferStatus.PUBLISHED) {
             throw new AppException(HttpStatus.BAD_REQUEST, "This job offer is not open for submissions");
@@ -133,14 +138,19 @@ public class CandidateService {
     }
 
     @Transactional
-    public void withdrawSubmission(Long jobOfferId, User user) {
-        CV cv = findLatestSubmission(jobOfferId, user);
-        CandidateEvaluation evaluation = cv.getCandidateEvaluation();
-        if (evaluation != null) {
-            cv.setCandidateEvaluation(null);
-            cvdao.save(cv);
-            candidateEvaluationDAO.delete(evaluation);
+    public void withdrawSubmission(Long evaluationId, User user) {
+        Candidate candidate = extractCandidate(user);
+        CandidateEvaluation evaluation = candidateEvaluationDAO.findById(evaluationId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Evaluation not found"));
+        CV cv = evaluation.getCv();
+        if (cv == null || cv.getCandidate() == null || !cv.getCandidate().getId().equals(candidate.getId())) {
+            throw new AppException(HttpStatus.FORBIDDEN, "You are not allowed to withdraw this submission");
         }
+
+        cv.setCandidateEvaluation(null);
+        cvdao.save(cv);
+        candidateEvaluationDAO.delete(evaluation);
+        
         if (cv.getFileUrl() != null && !cv.getFileUrl().isBlank()) {
             fileStorageUtil.deleteIfExists(cv.getFileUrl());
         }

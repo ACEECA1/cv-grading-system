@@ -105,10 +105,10 @@ public class CandidateController {
                 .body(resource);
     }
 
-    @DeleteMapping("/submissions/{jobOfferId}/cv")
-    public ResponseEntity<ApiResponse<Void>> withdrawSubmission(@PathVariable Long jobOfferId, Authentication authentication) {
+    @DeleteMapping("/submissions/{evaluationId}")
+    public ResponseEntity<ApiResponse<Void>> withdrawSubmission(@PathVariable Long evaluationId, Authentication authentication) {
         User user = (User) authentication.getPrincipal();
-        candidateService.withdrawSubmission(jobOfferId, user);
+        candidateService.withdrawSubmission(evaluationId, user);
         return ResponseEntity.ok(ApiResponse.ok("Submission withdrawn successfully", null));
     }
 }
