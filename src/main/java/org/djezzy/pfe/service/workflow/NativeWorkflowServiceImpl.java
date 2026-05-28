@@ -440,6 +440,7 @@ public class NativeWorkflowServiceImpl implements WorkflowProcessorService {
                     yrsObj.put("max", maxRequired);
                     ((ObjectNode) experienceAlignment).set("years_required", yrsObj);
                     ((ObjectNode) experienceAlignment).remove("yearsRequired");
+                    ((ObjectNode) experienceAlignment).put("match_score", matchScore);
                 }
                 }
             }

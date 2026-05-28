@@ -74,7 +74,7 @@ public class WorkflowSseService {
                 emitter.send(SseEmitter.event()
                         .name("error")
                         .data(Map.of("message", errorMessage)));
-                emitter.completeWithError(new RuntimeException(errorMessage));
+                emitter.complete();
             } catch (IOException e) {
                 log.error("Error failing SSE for evaluationId: {}", evaluationId, e);
             } finally {
