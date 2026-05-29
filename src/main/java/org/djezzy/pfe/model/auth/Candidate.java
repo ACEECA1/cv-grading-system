@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
+import lombok.Builder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +21,7 @@ import java.util.List;
 @Entity
 @Table(name = "candidates")
 public class Candidate extends User {
+    @Builder.Default
     @OneToMany(mappedBy = "candidate")
     private List<CV> cvs = new ArrayList<>();
 }
