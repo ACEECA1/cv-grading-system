@@ -1,6 +1,5 @@
 package org.djezzy.pfe.service.evaluation;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.djezzy.pfe.config.AppProperties;
 import org.djezzy.pfe.dao.evaluation.CVDAO;
@@ -18,7 +17,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.nio.file.Path;

@@ -10,7 +10,6 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.context.annotation.Import;
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
 import org.djezzy.pfe.filter.JwtAuthenticationFilter;
 import org.djezzy.pfe.filter.ApiKeyAuthenticationFilter;
@@ -19,7 +18,6 @@ import org.djezzy.pfe.config.AppProperties;
 
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;

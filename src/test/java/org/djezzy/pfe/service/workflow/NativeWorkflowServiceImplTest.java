@@ -5,9 +5,6 @@ import org.djezzy.pfe.config.AppProperties;
 import org.djezzy.pfe.dao.evaluation.CVDAO;
 import org.djezzy.pfe.dao.evaluation.CandidateEvaluationDAO;
 import org.djezzy.pfe.dao.job.JobOfferDAO;
-import org.djezzy.pfe.model.evaluation.CV;
-import org.djezzy.pfe.model.evaluation.CandidateEvaluation;
-import org.djezzy.pfe.model.job.JobOffer;
 import org.djezzy.pfe.service.job.LlmParsingService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,11 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class NativeWorkflowServiceImplTest {

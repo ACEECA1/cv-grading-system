@@ -1,6 +1,5 @@
 package org.djezzy.pfe.controller.evaluation;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.djezzy.pfe.config.AppProperties;
 import org.djezzy.pfe.dto.evaluation.CandidateEvaluationDTO;
 import org.djezzy.pfe.dto.evaluation.CandidateSubmissionDTO;
@@ -22,13 +21,11 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 
 import org.djezzy.pfe.model.auth.Role;
-import java.nio.file.Path;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -42,9 +39,6 @@ class CandidateControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-    @Autowired
-    private ObjectMapper objectMapper;
 
     @MockBean
     private CandidateService candidateService;
