@@ -18,7 +18,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "refresh_tokens")
 public class RefreshToken extends BaseEntity {
-    @Column(nullable = false, unique = true, length = 1000)
+    @Column(nullable = false, unique = true, length = 768)
     private String token;
 
     @Column(nullable = false)
