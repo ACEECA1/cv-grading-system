@@ -13,7 +13,6 @@ import org.djezzy.pfe.model.evaluation.EvaluationStatus;
 import org.djezzy.pfe.service.job.JobOfferService;
 import org.djezzy.pfe.util.AppException;
 import org.djezzy.pfe.util.MapperUtil;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
