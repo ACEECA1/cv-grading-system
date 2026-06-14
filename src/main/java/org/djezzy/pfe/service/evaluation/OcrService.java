@@ -86,7 +86,7 @@ public class OcrService {
     }
 
     private String extractDirectPdfText(Path pdfPath) {
-        try (PDDocument document = PDDocument.load(pdfPath.toFile())) {
+        try (PDDocument document = PDDocument.load(pdfPath.toFile(), org.apache.pdfbox.io.MemoryUsageSetting.setupTempFileOnly())) {
             PDFTextStripper textStripper = new PDFTextStripper();
             String text = textStripper.getText(document);
             return text == null ? "" : text.trim();
